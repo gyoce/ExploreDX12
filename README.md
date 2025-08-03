@@ -1,0 +1,4 @@
+# ExploreDX12
+This repository is my personal exploration of DirectX 12, focusing on understanding its features and capabilities. Along my exploration and learning process, I'll be documenting the things I learn in this repository under the [doc](Doc/Main.md) folder, the documentation is in french because that's my native language and it forces me to really understand the concepts before writing them down.
+
+I'm learning DirectX12 because I want to understand how it works for most of the big games out there. I'm learning with the help of the book *Introduction to 3D Game Programming with DirectX12* by Frank Luna.
