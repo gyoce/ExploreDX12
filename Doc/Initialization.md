@@ -5,6 +5,8 @@
 Sommaire : 
 - [Création du *device*](#création-du-device)
 - [Création de la barrière et des tailles de descripteurs](#création-de-la-barrière-et-des-tailles-de-descripteurs)
+- [Vérification du support du "4X MSAA"](##vérification-du-support-du-4x-msaa)
+- [Création de la file de commande et de la liste de commande](#création-de-la-file-de-commande-et-de-la-liste-de-commande)
 
 ## Création du *device*
 Pour initialiser DirectX12 on doit d’abord créer un `ID3D12Device`. Ce *device* représente un *display adapter* (un GPU par exemple). Pour créer ce device on peut le faire grâce à : 
@@ -54,6 +56,7 @@ if(FAILED(hardwareResult))
 ## Création de la barrière et des tailles de descripteurs
 On peut maintenant créer la barrière qui permet de faire une synchronisation CPU/GPU.
 ```cpp
+Microsoft::WRL::ComPtr<ID3D12Device> md3dDevice;
 Microsoft::WRL::ComPtr<ID3D12Fence> mFence;
 UINT mRtvDescriptorSize, mDsvDescriptorSize, mCbvDescriptorSize;
 
@@ -62,4 +65,46 @@ ThrowIfFailed(md3dDevice->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&mF
 mRtvDescriptorSize = md3dDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 mDsvDescriptorSize = md3dDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
 mCbvDescriptorSize = md3dDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+```
+
+## Vérification du support du "4X MSAA"
+On peut vérifier le support de la fonctionnalité *4X MSAA* car elle donne une meilleure qualité d'image sans pour autant être trop gourmande en ressources. Mais on doit vérifier le niveau de qualité pris en charge avec : 
+```cpp
+Microsoft::WRL::ComPtr<ID3D12Device> md3dDevice;
+DXGI_FORMAT mBackBufferFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
+UINT m4xMsaaQuality;
+
+D3D12_FEATURE_DATA_MULTISAMPLE_QUALITY_LEVELS msQualityLevels;
+msQualityLevels.Format = mBackBufferFormat;
+msQualityLevels.SampleCount = 4;
+msQualityLevels.Flags = D3D12_MULTISAMPLE_QUALITY_LEVELS_FLAG_NONE;
+msQualityLevels.NumQualityLevels = 0;
+ThrowIfFailed(
+    md3dDevice->CheckFeatureSupport(D3D12_FEATURE_MULTISAMPLE_QUALITY_LEVELS, &msQualityLevels, sizeof(msQualityLevels))
+);
+m4xMsaaQuality = msQualityLevels.NumQualityLevels;
+assert(m4xMsaaQuality > 0 && "Unexpected MSAA quality level.");
+```
+
+## Création de la file de commande et de la liste de commande
+On peut créer ces deux éléments par le processus suivant : 
+```cpp
+Microsoft::WRL::ComPtr<ID3D12Device> md3dDevice;
+ComPtr<ID3D12CommandQueue> mCommandQueue;
+ComPtr<ID3D12CommandAllocator> mDirectCmdListAlloc;
+ComPtr<ID3D12GraphicsCommandList> mCommandList;
+
+D3D12_COMMAND_QUEUE_DESC queueDesc = {};
+queueDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
+queueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
+ThrowIfFailed(
+    md3dDevice->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&mCommandQueue))
+);
+ThrowIfFailed(
+    md3dDevice->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(mDirectCmdListAlloc.GetAddressOf()))
+);
+ThrowIfFailed(
+    md3dDevice->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, mDirectCmdListAlloc.Get(), nullptr, IID_PPV_ARGS(mCommandList.GetAddressOf()))
+);
+mCommandList->Close();
 ```
