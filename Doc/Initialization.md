@@ -1,12 +1,15 @@
 # Initialisation
 
-[Page d'accueil](Main.md)
+[Page d'accueil](README.md)
 
 Sommaire : 
 - [Création du *device*](#création-du-device)
 - [Création de la barrière et des tailles de descripteurs](#création-de-la-barrière-et-des-tailles-de-descripteurs)
 - [Vérification du support du "4X MSAA"](##vérification-du-support-du-4x-msaa)
 - [Création de la file et liste de commande](#création-de-la-file-et-liste-de-commande)
+- [Création de la *Swap Chain*](#création-de-la-swap-chain)
+- [Créer les tas de descripteurs](#créer-les-tas-de-descripteurs)
+- [Créer la vue de rendu](#créer-la-vue-de-rendu)
 
 ## Création du *device*
 Pour initialiser DirectX12 on doit d’abord créer un `ID3D12Device`. Ce *device* représente un *display adapter* (un GPU par exemple). Pour créer ce device on peut le faire grâce à : 
@@ -201,4 +204,91 @@ sd.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;
 ThrowIfFailed(
     mdxgiFactory->CreateSwapChain(mCommandQueue.Get(), &sd, mSwapChain.GetAddressOf())
 );
+```
+
+## Créer les tas de descripteurs
+[Explications](Overview.md#ressources-et-descripteurs)
+
+On a besoin de créer les tas de descripteurs pour stocker les descripteurs/vues que notre application va utiliser. Un tas de descripteur est représenté par l'interface `ID3D12DescriptorHeap` et est créé avec la méthode `ID3D12Device::CreateDescriptorHeap`. Ici on va avoir besoin de `SwapChainBufferCount` (= 2) *RTV* pour décrire les ressources de tampon et 1 *DSV* pour décrire le *depth/stencil buffer*. 
+```cpp
+Microsoft::WRL::ComPtr<ID3D12Device> md3dDevice;
+Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> mRtvHeap;
+Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> mDsvHeap;
+
+D3D12_DESCRIPTOR_HEAP_DESC rtvHeapDesc;
+rtvHeapDesc.NumDescriptors = SwapChainBufferCount; // = 2
+rtvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
+rtvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
+rtvHeapDesc.NodeMask = 0; 
+ThrowIfFailed(
+    md3dDevice->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(&mRtvHeap.GetAddressOf()))
+);
+
+D3D12_DESCRIPTOR_HEAP_DESC dsvHeapDesc;
+dsvHeapDesc.NumDescriptors = 1;
+dsvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
+dsvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
+dsvHeapDesc.NodeMask = 0;
+ThrowIfFailed(
+    md3dDevice->CreateDescriptorHeap(&dsvHeapDesc, IID_PPV_ARGS(&mDsvHeap.GetAddressOf()))
+);
+```
+Dans notre application on a besoin de savoir quel est le tampon actuel, on peut le faire simplement avec `int mCurrBackBuffer = 0;` qui sera l'index du tampon. 
+Après avoir créé les tas de descripteurs, on doit pouvoir accéder aux descripteurs qu'ils contiennent. L'application reférence les descripteurs par leur *handle*. On peut obtenir le *handle* du premier descripteur du tas de descripteur avec la méthode `ID3D12DescriptorHeap::GetCPUDescriptorHandleForHeapStart`. On peut donc avoir deux fonctions qui nous permettent d'obtenir les *handles* qui nous intéressent :
+```cpp
+D3D12_CPU_DESCRIPTOR_HANDLE GetCurrentBackBufferView() const
+{
+    // Ici on utilise un constructeur de CD3DX12 pour *offset* vers le RTV du tampon actuel
+    return CD3DX12_CPU_DESCRIPTOR_HANDLE(
+        mRtvHeap->GetCPUDescriptorHandleForHeapStart(), 
+        mCurrBackBuffer, // Index à offset
+        mRtvDescriptorSize // taille en octet du descripteur
+    );
+}
+
+D3D12_CPU_DESCRIPTOR_HANDLE GetDepthStencilView() const
+{
+    return CD3DX12_CPU_DESCRIPTOR_HANDLE(
+        mDsvHeap->GetCPUDescriptorHandleForHeapStart()
+    );
+}
+```
+
+## Créer la vue de rendu
+Pour rappel on ne *bind* pas une ressource pour une étape de la pipeline de rendu, à la plce on doit créer une vue de ressource (descripteur) vers la ressource et on *bind* la vue vers l'étape de la pipeline de rendu. Donc, pour *bind* le *back buffer* vers l'étape de rendu, on doit d'abord créer une vue de rendu vers le *back buffer*. La première étape est de récupérer les ressources du tampon qui sont stockées dans la *Swap Chain* : 
+```cpp
+HRESULT IDXGISwapChain::GetBuffer(
+    UINT Buffer, 
+    REFIID riid, 
+    void **ppSurface
+);
+```
+1. ***Buffer*** : est l'index du tampon dans la *Swap Chain* (0 pour le premier tampon, 1 pour le second, etc.).
+2. ***riid*** : est le *COM ID* de l'interface `ID3D12Resource` que l'on veut récupérer.
+3. ***ppSurface*** : est un pointeur de sortie vers la ressource tampon récupérée.
+ATTENTION : l'appel vers `GetBuffer` augmente le nombre de références du *back buffer*, donc on doit *release* quand on a fini de l'utiliser (c'est automatiquement fait si on utilise `ComPtr`).
+
+Pour créer le *RTV* on utilise : 
+```cpp
+HRESULT ID3D12Device::CreateRenderTargetView(
+    ID3D12Resource *pResource, 
+    const D3D12_RENDER_TARGET_VIEW_DESC *pDesc, 
+    D3D12_CPU_DESCRIPTOR_HANDLE DestDescriptor
+);
+```
+1. ***pResource*** : spécifie la ressource qui va être utilisée comme cible de rendu, par exemple le *back buffer*.
+2. ***pDesc*** : est un pointeur vers la structure `D3D12_RENDER_TARGET_VIEW_DESC` qui décrit le type de donnée des éléments dans la ressource.
+3. ***DestDescriptor*** : est le *handle* du descripteur qui stockera la RTV créée.
+
+Voici un exemple de création de *RTV* pour chaque tampon dans la *Swap Chain* :
+```cpp
+Microsoft::WRL::ComPtr<ID3D12Resource> mSwapChainBuffers[SwapChainBufferCount];
+
+CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHeapHandle(mRtvHeap->GetCPUDescriptorHandleForHeapStart());
+for (UINT i = 0; i < SwapChainBufferCount; i++)
+{
+    ThrowIfFailed(mSwapChain->GetBuffer(i, IID_PPV_ARGS(&mSwapChainBuffers[i])));
+    md3dDevice->CreateRenderTargetView(mSwapChainBuffers[i].Get(), nullptr, rtvHeapHandle);
+    rtvHeapHandle.Offset(1, mRtvDescriptorSize);
+}
 ```

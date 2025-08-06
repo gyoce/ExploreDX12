@@ -1,9 +1,10 @@
 # Vue d'ensemble
 
-[Page d'accueil](Main.md)
+[Page d'accueil](README.md)
 
 Sommaire :
 - [COM](#com)
+- [Swap Chain](#swap-chain)
 - [Ressources et descripteurs](#ressources-et-descripteurs)
 - [File et liste de commande](#file-et-liste-de-commande)
 
@@ -48,9 +49,9 @@ La file de commande (***Command Queue***) est représentée par l'interface `ID3
 Une des méthodes principales de la file de commande est `ExecuteCommandLists` qui permet d'ajouter des listes de commande à la file de commande : 
 ```cpp
 void ID3D12CommandQueue::ExecuteCommandLists(
-    // Number of commands lists in the array
+    // Nombre de listes de commande dans le tableau
     UINT Count, 
-    // Pointer to the first element in an array of command lists
+    // Pointeur vers le tableau de listes de commande
     ID3D12CommandList *const *ppCommandLists 
 );
 ```
