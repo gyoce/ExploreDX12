@@ -30,6 +30,9 @@ Pour éviter le *flickering* (scintillement) pour les animations, on *rend* une 
 
 Elle est représentée par l'interface `IDXGISwapChain` qui stocke les tampons et fournit des méthodes comme `IDXGISwapChain::ResizeBuffers` et `IDXGISwapChain::Present`. 
 
+## *Depth buffering*
+Le tampon de profondeur (*depth buffer*) est une texture qui ne contient pas de données d'image mais qui stocke la profondeur de chaque pixel. Ses valeurs possibles sont entre 0.0 et 1.0, avec 0.0 étant le plus proche de la caméra et 1.0 étant le plus loin. Le tampon de profondeur est utilisé pour déterminer si un pixel doit être dessiné ou non. 
+
 ## Ressources et descripteurs
 Pendant le rendu, le GPU va écrire vers des ressources et lire depuis des ressources. Avant de demander à dessiner, on doit d’abord lier les ressources à la pipeline de rendu. Cependant, les ressources GPU ne sont pas liées directement, on utilise des **descriptors** qui peut être vu comme des structures légères qui décrivent la ressource au GPU. Les descripteurs ont des *types* et ces types indiquent comment la ressource va être utilisée. Par exemple : 
 - **CBV** / **SRV** / **UAV** désignent respectivement les *Constant Buffer View*, *Shader Resource View* et *Unordered Access View*.

@@ -5,7 +5,7 @@
 Sommaire : 
 - [Création du *device*](#création-du-device)
 - [Création de la barrière et des tailles de descripteurs](#création-de-la-barrière-et-des-tailles-de-descripteurs)
-- [Vérification du support du "4X MSAA"](##vérification-du-support-du-4x-msaa)
+- [Vérification du support du "4X MSAA"](#vérification-du-support-du-4x-msaa)
 - [Création de la file et liste de commande](#création-de-la-file-et-liste-de-commande)
 - [Création de la *Swap Chain*](#création-de-la-swap-chain)
 - [Créer les tas de descripteurs](#créer-les-tas-de-descripteurs)
@@ -72,7 +72,7 @@ mDsvDescriptorSize = md3dDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPT
 mCbvDescriptorSize = md3dDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 ```
 
-## Vérification du support du "4X MSAA"
+## Vérification du support du 4X MSAA
 On peut vérifier le support de la fonctionnalité *4X MSAA* car elle donne une meilleure qualité d'image sans pour autant être trop gourmande en ressources. Mais on doit vérifier le niveau de qualité pris en charge avec : 
 ```cpp
 Microsoft::WRL::ComPtr<ID3D12Device> md3dDevice;
@@ -206,7 +206,7 @@ ThrowIfFailed(
 );
 ```
 
-## Créer les tas de descripteurs
+## Création des tas de descripteurs
 [Explications](Overview.md#ressources-et-descripteurs)
 
 On a besoin de créer les tas de descripteurs pour stocker les descripteurs/vues que notre application va utiliser. Un tas de descripteur est représenté par l'interface `ID3D12DescriptorHeap` et est créé avec la méthode `ID3D12Device::CreateDescriptorHeap`. Ici on va avoir besoin de `SwapChainBufferCount` (= 2) *RTV* pour décrire les ressources de tampon et 1 *DSV* pour décrire le *depth/stencil buffer*. 
@@ -254,7 +254,7 @@ D3D12_CPU_DESCRIPTOR_HANDLE GetDepthStencilView() const
 }
 ```
 
-## Créer la vue de rendu
+## Création de la vue de rendu
 Pour rappel on ne *bind* pas une ressource pour une étape de la pipeline de rendu, à la plce on doit créer une vue de ressource (descripteur) vers la ressource et on *bind* la vue vers l'étape de la pipeline de rendu. Donc, pour *bind* le *back buffer* vers l'étape de rendu, on doit d'abord créer une vue de rendu vers le *back buffer*. La première étape est de récupérer les ressources du tampon qui sont stockées dans la *Swap Chain* : 
 ```cpp
 HRESULT IDXGISwapChain::GetBuffer(
@@ -292,3 +292,111 @@ for (UINT i = 0; i < SwapChainBufferCount; i++)
     rtvHeapHandle.Offset(1, mRtvDescriptorSize);
 }
 ```
+
+## Création du tampon de profondeur/stencil et la vue
+On doit maintenant créer le tampon de profondeur/stencil qui va être utilisé pour le rendu. Une texture est un type de ressource GPU donc on peut la créer en remplissant une structure `D3D12_RESOURCE_DESC` qui décrit la texture :
+```cpp
+typedef struct D3D12_RESOURCE_DESC 
+{
+    D3D12_RESOURCE_DIMENSION Dimension;
+    UINT Alignment;
+    UINT64 Width;
+    UINT Height;
+    UINT DepthOrArraySize;
+    UINT MipLevels;
+    DXGI_FORMAT Format;
+    D3D12_SAMPLE_DESC SampleDesc;
+    D3D12_TEXTURE_LAYOUT Layout;
+    D3D12_RESOURCE_MISC_FLAGS MiscFlags;
+} D3D12_RESOURCE_DESC;
+
+// Avec l'énumération D3D12_RESOURCE_DIMENSION
+typedef enum D3D12_RESOURCE_DIMENSION
+{
+    D3D12_RESOURCE_DIMENSION_UNKNOWN = 0,
+    D3D12_RESOURCE_DIMENSION_BUFFER = 1,
+    D3D12_RESOURCE_DIMENSION_TEXTURE1D = 2,
+    D3D12_RESOURCE_DIMENSION_TEXTURE2D = 3,
+    D3D12_RESOURCE_DIMENSION_TEXTURE3D = 4
+} D3D12_RESOURCE_DIMENSION;
+```
+1. ***Dimension*** : spécifie la dimension de la ressource cf l'énumération `D3D12_RESOURCE_DIMENSION`.
+2. ***Width*** : est la largeur de la texture en texels. Pour les tampons de ressources, c'est la taille en octets dans le tampon.
+3. ***Height*** : est la hauteur de la texture en texels.
+4. ***DepthOrArraySize*** : est la profondeur de la texture en texels ou la taille du tableau de textures (pour les textures 1D et 2D). A savoir qu'on ne peut pas avoir de tableau de textures 3D.
+5. ***MipLevels*** : est le nombre de niveaux de mipmap dans la texture. Pour créer le tampon de profondeur/stencil, on met 1.
+6. ***Format*** : est le format de la texture, donc un membre de l'énumération `DXGI_FORMAT`.
+7. ***SampleDesc*** : est la description de l'échantillonnage.
+8. ***Layout*** : est la disposition des données dans la texture, donc un membre de l'énumération `D3D12_TEXTURE_LAYOUT`.
+9. ***MiscFlags*** : est un ensemble de flags divers qui spécifient des options supplémentaires pour la ressource, ici on utilisera `D3D12_RESOURCE_MISC_DEPTH_STENCIL`.
+
+Les ressourcs GPU vivent dans des tas, qui sont essentiellement des blocs de mémoire GPU avec certaines propriétés. On peut créer et attribue une ressource à un tas particulier avec la méthode : 
+```cpp
+HRESULT ID3D12Device::CreateCommittedResource(
+    const D3D12_HEAP_PROPERTIES *pHeapProperties, 
+    D3D12_HEAP_MISC_FLAGS HeapMiscFlags, 
+    const D3D12_RESOURCE_DESC *pResourceDesc, 
+    D3D12_RESOURCE_USAGE InitialResourceState,
+    const D3D12_CLEAR_VALUE *pOptimizedClearValue, 
+    REFIID riidResource, 
+    void **ppvResource
+);
+
+// Avec la structure D3D12_HEAP_PROPERTIES
+typedef struct D3D12_HEAP_PROPERTIES
+{
+    D3D12_HEAP_TYPE Type;
+    D3D12_CPU_PAGE_PROPERTIES CPUPageProperties;
+    D3D12_MEMORY_POOL MemoryPoolPreference;
+    UINT CreationNodeMask;
+    UINT VisibleNodeMask;
+} D3D12_HEAP_PROPERTIES;
+```
+1. ***pHeapProperties*** : spécifie les propriétés du tas dans lequel la ressource sera allouée. Pour le moment, la principale propriété que l'on va utiliser est le type de tas qui est un membre de l'énumération `D3D12_HEAP_TYPE`.
+2. ***HeapMiscFlags*** : spécifie les flags additionnels de tas, généralement on met `D3D12_HEAP_MISC_NONE`.
+3. ***pResourceDesc*** : est un pointeur vers la structure `D3D12_RESOURCE_DESC` que l'on a rempli.
+4. ***InitialResourceState*** : spécifie l'état initial de la ressource, pour le tampon de profondeur/stencil on met `D3D12_RESOURCE_USAGE_INITIAL` et plus tard on mettre `D3D12_RESOURCE_USAGE_DEPTH` comme ça, il pourra être utilisé dans la pipeline.
+5. ***pOptimizedClearValue*** : est un pointeur vers une structure `D3D12_CLEAR_VALUE` qui décrit une valeur optimisée pour le nettoyage de la ressource. 
+6. ***riidResource*** : est le *COM ID* de l'interface `ID3D12Resource` que l'on veut créer.
+7. ***ppvResource*** : est un pointeur de sortie vers la ressource créée.
+
+Avant d'utiliser le tampon de profondeur/stencil, on doit d'abord créer une vue de profondeur/stencil qui sera lié à la pipeline de rendu. On peut la créer de cette manière :  
+```cpp
+Microsoft::WRL::ComPtr<ID3D12Resource> mDepthStencilBuffer;
+DXGI_FORMAT mDepthStencilFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
+Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> mDsvHeap;
+
+D3D12_RESOURCE_DESC depthStencilDesc;
+depthStencilDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+depthStencilDesc.Alignment = 0;
+depthStencilDesc.Width = mClientWidth;
+depthStencilDesc.Height = mClientHeight;
+depthStencilDesc.DepthOrArraySize = 1;
+depthStencilDesc.MipLevels = 1;
+depthStencilDesc.Format = mDepthStencilFormat;
+depthStencilDesc.SampleDesc.Count = m4xMsaaState ? 4 : 1;
+depthStencilDesc.SampleDesc.Quality = m4xMsaaState ? (m4xMsaaQuality - 1) : 0;
+depthStencilDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+depthStencilDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
+
+D3D12_CLEAR_VALUE optClear;
+optClear.Format = mDepthStencilFormat;
+optClear.DepthStencil.Depth = 1.0f;
+optClear.DepthStencil.Stencil = 0;
+ThrowIfFailed(
+    md3dDevice->CreateCommittedResource(
+        &CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
+        D3D12_HEAP_FLAG_NONE,
+        &depthStencilDesc,
+        D3D12_RESOURCE_STATE_COMMON,
+        &optClear,
+        IID_PPV_ARGS(mDepthStencilBuffer.GetAddressOf())
+    )
+);
+
+md3dDevice->CreateDepthStencilView(mDepthStencilBuffer.Get(), nullptr, mDsvHeap->GetCPUDescriptorHandleForHeapStart());
+
+mCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(mDepthStencilBuffer.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_DEPTH_WRITE));
+```
+- Ici on se sert du constructeur `CD3DX12_HEAP_PROPERTIES` qui nous permet de créer une instance de la structure `D3D12_HEAP_PROPERTIES`.
+- Le second paramètre de `CreateDepthStencilView` est un pointeur vers la structure `D3D12_DEPTH_STENCIL_VIEW_DESC`.
