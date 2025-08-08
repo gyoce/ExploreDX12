@@ -2,4 +2,5 @@
 
 Sommaire :
 - [Vue d'ensemble](Overview.md)
+- [API Windows](WindowsAPI.md)
 - [Initialiation](Initialization.md)
