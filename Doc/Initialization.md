@@ -8,8 +8,12 @@ Sommaire :
 - [Vérification du support du "4X MSAA"](#vérification-du-support-du-4x-msaa)
 - [Création de la file et liste de commande](#création-de-la-file-et-liste-de-commande)
 - [Création de la *Swap Chain*](#création-de-la-swap-chain)
-- [Créer les tas de descripteurs](#créer-les-tas-de-descripteurs)
-- [Créer la vue de rendu](#créer-la-vue-de-rendu)
+- [Création des tas de descripteurs](#création-des-tas-de-descripteurs)
+- [Création de la vue de rendu](#création-de-la-vue-de-rendu)
+- [Création du tampon de profondeur/stencil et la vue](#création-du-tampon-de-profondeurstencil-et-la-vue)
+- [Définition du *viewport*](#définition-du-viewport)
+- [Définition du *scissor rect*](#définition-du-scissor-rect)
+
 
 ## Création du *device*
 Pour initialiser DirectX12 on doit d’abord créer un `ID3D12Device`. Ce *device* représente un *display adapter* (un GPU par exemple). Pour créer ce device on peut le faire grâce à : 
@@ -400,3 +404,45 @@ mCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(mDepthSte
 ```
 - Ici on se sert du constructeur `CD3DX12_HEAP_PROPERTIES` qui nous permet de créer une instance de la structure `D3D12_HEAP_PROPERTIES`.
 - Le second paramètre de `CreateDepthStencilView` est un pointeur vers la structure `D3D12_DEPTH_STENCIL_VIEW_DESC`.
+
+## Définition du *viewport*
+Habituellement on rend la scène 3D en entier dans le *back buffer* avec la taille du tampon qui correspond à la taille de l'écran ou de la fenêtre. Mais on peut aussi définir un *viewport* qui est une zone de rendu dans le tampon. Le *viewport* est défini par la structure : 
+```cpp
+typedef struct D3D12_VIEWPORT 
+{
+    FLOAT TopLeftX;
+    FLOAT TopLeftY;
+    FLOAT Width;
+    FLOAT Height;
+    FLOAT MinDepth;
+    FLOAT MaxDepth;
+} D3D12_VIEWPORT;
+```
+On peut voir que les 4 premiers paramètres définissent le rectangle de rendu dans le tampon. On rappelle que les valeurs de profondeurs sont normalisées entre 0.0 et 1.0, les paramètres `MinDepth` et `MaxDepth` permettent de transformer l'intervalle de profondeur de [0, 1] vers [MinDepth, MaxDepth] mais habituellement on met `MinDepth` à 0.0 et `MaxDepth` à 1.0 pour que les valeurs ne soient pas modifiées. Pour définir le *viewport* on peut faire : 
+```cpp
+D3D12_VIEWPORT vp;
+vp.TopLeftX = 0.0f;
+vp.TopLeftY = 0.0f;
+vp.Width = static_cast<FLOAT>(mClientWidth);
+vp.Height = static_cast<FLOAT>(mClientHeight);
+vp.MinDepth = 0.0f;
+vp.MaxDepth = 1.0f;
+mCommandList->RSSetViewports(1, &vp);
+```
+
+## Définition du *scissor rect*
+On peut définir une zone de découpe (*scissor rect*) qui permet de ne pas rendre les pixels en dehors de cette zone. La zone de découpe est définie par la structure :
+```cpp
+typedef struct D3D12_RECT 
+{
+    LONG left;
+    LONG top;
+    LONG right;
+    LONG bottom;
+} D3D12_RECT;
+```
+On peut alors définir le *scissor rect* de la manière suivante :
+```cpp
+D3D12_RECT mScissorRect = {0, 0, mClientWidth / 2, mClientHeight / 2};
+mCommandList->RSSetScissorRects(1, &mScissorRect);
+```
