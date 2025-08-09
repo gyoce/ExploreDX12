@@ -5,6 +5,7 @@
 Sommaire :
 - [Généralités](#généralités)
 - [Application Windows basique](#application-windows-basique)
+- [Une meilleure boucle de message](#une-meilleure-boucle-de-message)
 
 ## Généralités
 Une application Windows suit le modèle de *Event-driven programming* (programmation basée sur les événements), ce qui signifie qu'elle attend des événements. Un événement peut être une touche de clavier, un clic de souris, quand la fenêtre est créée/redimensionnée/fermée, etc.
@@ -127,5 +128,28 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR pCmdLine, 
     if (!InitWindowsApp(hInstance, nShowCmd))
         return 0;
     return Run();
+}
+```
+
+## Une meilleure boucle de message
+Habituellement, les jeux n'attendent pas des événements mais sont constamment mis à jour. Dans le bout de code précédent cela pose problème car la fonction `GetMessage()` met le thread de l'application en veille jusqu'à réception d'un message. Le fix pour ce problème est assez simple, il faut utiliser la méthode `PeekMessage()` à la place de `GetMessage()`, s'il n'y a pas de messages, la fonction retourne de suite. La nouvelle boucle est donc : 
+```cpp
+int Run()
+{
+    MSG msg = {0};
+
+    while (msg.message != WM_QUIT)
+    {
+        if (PeekMessage(&msg, 0, 0, 0, PM_REMOVE))
+        {
+            TrannslateMessage(&msg);
+            DispatchMessage(&msg);
+        }
+        else 
+        {
+            // Ici on peut mettre le code du jeu à jour    
+        }
+    }
+    return (int)msg.wParam;
 }
 ```
