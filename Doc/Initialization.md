@@ -39,7 +39,7 @@ Microsoft::WRL::ComPtr<ID3D12Device> md3dDevice;
 #if defined(DEBUG) || defined(_DEBUG)
 {
     ComPtr<ID3D12Debug> debugController;
-    ThrowIfFailed(D3D12GetDebugInterface(IID_PPV_ARGS(&debugController));
+    ThrowIfFailed(D3D12GetDebugInterface(IID_PPV_ARGS(&debugController)));
     debugController->EnableDebugLayer();
 }
 #endif

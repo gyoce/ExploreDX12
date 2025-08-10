@@ -6,6 +6,7 @@ Sommaire :
 - [Généralités](#généralités)
 - [Application Windows basique](#application-windows-basique)
 - [Une meilleure boucle de message](#une-meilleure-boucle-de-message)
+- [Mesure de temps](#mesure-de-temps)
 
 ## Généralités
 Une application Windows suit le modèle de *Event-driven programming* (programmation basée sur les événements), ce qui signifie qu'elle attend des événements. Un événement peut être une touche de clavier, un clic de souris, quand la fenêtre est créée/redimensionnée/fermée, etc.
@@ -152,4 +153,38 @@ int Run()
     }
     return (int)msg.wParam;
 }
+```
+
+## Mesure de temps
+Pour des mesures de temps on peut utiliser l'API Windows, plus particulièrement des *performance timer*. Le *timer* de performance mesure le temps en unités appelées *counts*.  On peut obtenir la valeur du temps actuel avec : 
+```cpp
+__int64 currentTime;
+QueryPerformanceCounter((LARGE_INTEGER*)&currentTime);
+```
+
+Pour obtenir la fréquence (nombre de *count* par seconde) du *performance timer*, on peut utiliser la fonction suivante : 
+```cpp
+__int64 frequency;
+QueryPerformanceFrequency((LARGE_INTEGER*)&frequency);
+```
+
+On peut alors calculer le nombre de seconds (ou fraction de seconde) par *count* avec : 
+```cpp
+double secondsPerCount = 1.0 / (double)frequency;
+```
+
+On peut donc calculer un nombre de *count* en secondes grâce à : 
+```cpp
+valueInSeconds = valueInCounts * secondsPerCount;
+```
+
+On peut donc calculer un temps écoulé entre deux instants grâce à :
+```cpp
+__int64 start = 0;
+__int64 end = 0;
+QueryPerformanceCounter((LARGE_INTEGER*)&start);
+// ...
+QueryPerformanceCounter((LARGE_INTEGER*)&end);
+__int64 elapsed = end - start;
+double elapsedInSeconds = elapsed * secondsPerCount;
 ```
