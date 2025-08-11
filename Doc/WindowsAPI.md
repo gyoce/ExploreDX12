@@ -143,7 +143,7 @@ int Run()
     {
         if (PeekMessage(&msg, 0, 0, 0, PM_REMOVE))
         {
-            TrannslateMessage(&msg);
+            TranslateMessage(&msg);
             DispatchMessage(&msg);
         }
         else 

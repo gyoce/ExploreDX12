@@ -225,7 +225,7 @@ rtvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
 rtvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
 rtvHeapDesc.NodeMask = 0; 
 ThrowIfFailed(
-    md3dDevice->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(&mRtvHeap.GetAddressOf()))
+    md3dDevice->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(mRtvHeap.GetAddressOf()))
 );
 
 D3D12_DESCRIPTOR_HEAP_DESC dsvHeapDesc;
@@ -234,7 +234,7 @@ dsvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
 dsvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
 dsvHeapDesc.NodeMask = 0;
 ThrowIfFailed(
-    md3dDevice->CreateDescriptorHeap(&dsvHeapDesc, IID_PPV_ARGS(&mDsvHeap.GetAddressOf()))
+    md3dDevice->CreateDescriptorHeap(&dsvHeapDesc, IID_PPV_ARGS(mDsvHeap.GetAddressOf()))
 );
 ```
 Dans notre application on a besoin de savoir quel est le tampon actuel, on peut le faire simplement avec `int mCurrBackBuffer = 0;` qui sera l'index du tampon. 
