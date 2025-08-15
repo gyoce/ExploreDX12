@@ -5,3 +5,4 @@ Sommaire :
 - [API Windows](WindowsAPI.md)
 - [Initialiation](Initialization.md)
 - [DirectX Math](DirectXMath.md)
+- [La pipeline de rendu](RenderingPipeline.md)
