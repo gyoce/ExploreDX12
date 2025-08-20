@@ -5,6 +5,7 @@
 Sommaire :
 - [COM](#com)
 - [Swap Chain](#swap-chain)
+- [Depth buffering](#depth-buffering)
 - [Ressources et descripteurs](#ressources-et-descripteurs)
 - [File et liste de commande](#file-et-liste-de-commande)
 

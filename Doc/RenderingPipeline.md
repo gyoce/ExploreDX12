@@ -8,6 +8,7 @@ Sommaire :
 - [L'étape *Input Assembler*](#létape-input-assembler)
     - [Topologie](#topologie)
     - [Indices](#indices)
+- [L'étape *Vertex Shader*](#létape-vertex-shader)
 
 ## Couleurs
 Les écrans émettent une mixture de lumière rouge, vert et bleu pour chaque pixel. On utilise donc un modèle de couleur RGB (Red, Green, Blue) pour représenter les couleurs. Chaque écran possède une intensité maximale de lumière qu'il peut émettre, il est utile d'utiliser un intervalle normalisé de 0 à 1 pour ces intensités avec 0 représentant l'absence de lumière et 1 représentant l'intensité maximale. En plus du R,G,B on utilise aussi un canal alpha (A) pour représenter la transparence d'une couleur. On a donc la possibilité d'exprimer une couleur avec 128 bits (16 octets), on peut donc utiliser un `XMVECTOR`.
@@ -100,3 +101,19 @@ UINT indexList[6] = {
     0, 2, 3, // Triangle 1
 };
 ```
+
+## L'étape *Vertex Shader*
+Après que les primitives aient été assemblées, les sommets sont données au *Vertex Shader*. On peut voir ce dernier comme une fonction qui prend en entrée un sommet et qui produit en sortie un sommet transformé. 
+
+### Local space vs World space
+Généralement, on construit des objets dans un système de coordonnées local (*local space*), une fois ceci fait, on les place dans le monde. Pour cela, on doit définir comment l'espace local et l'espace du monde sont liés. Cela se fait en spécifiant ou on veut placer l'origine et les axes du système de coordonnées de l'espace local par rapport au système de coordonnées global de la scène puis en exécutant une transformation de coordonnées. Ce processus de transformation de coordonnées d'un espace local en un espace du monde est appelé **World Transformation** et la matrice associée est la **World Matrix**. Chaque objet dans la scène a sa propre matrice monde.
+
+### View space
+Pour créer une image 2D de la scène, on doit placer une caméra virutelle dans la scène. La caméra définit quel volume du monde le spectateur peut voir. Admettons que l'on attache un système de coordonnées local à la caméra. Celle-ci repose à l'origine et regarde vers le bas de l'axe *z* positif, l'axe *x* pointe vers la droite de la caméra et l'axe *y* pointe au dessus de la caméra. Au lieu de décrire les sommets de notre scène par rapport à l'espace monde, il est plus pratique pour les étapes suivantes de la pipeline de les décrire par rapport au système de coordonnées de la caméra. Le changement de transformation de coordonnées de l'espace monde vers l'espace de vue est appelé **View Transformation** et la matrice associée est la **View Matrix**.
+
+### Projection et *Homogeneous Clip space*
+On a décrit la position et l'orientation de la caméra dans le monde mais il y a un autre composant pour la caméra qui est le *volume* de l'espace que la caméra perçoit. Ce volume est décrit par un *frustum* (pyramide tronquée). Il faut donc projeter les géométrie 3D à l'intérieur de ce frustum vers une fenêtre de projection 2D. La projection doit être faite de sorte à ce que les lignes parallèles converge vers un point de fuite.
+
+On peut définir un frustum dans l'espace de vue, avec le centre de projection à l'origine et orienté vers le bas de l'axe *z* positif. On définit quatre composantes : le plan de près (*near plane*) `n`, le plan de loin (*far plane*) `f`, l'angle de champs vertical (*vertical field of view angle*) `α`, et l'aspect ration `r`. Á noter que dans l'espace de vue, le *near plane* et le *far plane* sont parallèles au plan *xy*.
+
+Les coordonnées des points projetés sont calculés dans l'espace de vue. Dans l'espace de vue, la fenêtre de projection a une hauteur de 2 et une largeur de `2*r` avec `r` l'aspect ratio. Le problème avec ça est que les dimensions dependent de l'aspect ratio, cela veut dire qu'on doit dire au GPU l'aspect ratio. Il est plus pratique d'enlever cette dépendance, on peut le faire en mettant à l'échelle la coordonnée *x* projetée de l'intervalle `[-r, +r]` à `[-1, +1]`. Après cette manipulation, les coordonnées *x* et *y* sont dites **Normalized Device Coordinates** (NDC).
