@@ -9,6 +9,12 @@ Sommaire :
     - [Topologie](#topologie)
     - [Indices](#indices)
 - [L'étape *Vertex Shader*](#létape-vertex-shader)
+    - [Local space vs World space](#local-space-vs-world-space)
+    - [View space](#view-space)
+    - [Projection et *Homogeneous Clip space*](#projection-et-homogeneous-clip-space)
+- [Les étapes de *Tessellation*](#les-étapes-de-tessellation)
+- [L'étape de *Geometry Shader*](#létape-de-geometry-shader)
+- [*Clipping*](#clipping)
 
 ## Couleurs
 Les écrans émettent une mixture de lumière rouge, vert et bleu pour chaque pixel. On utilise donc un modèle de couleur RGB (Red, Green, Blue) pour représenter les couleurs. Chaque écran possède une intensité maximale de lumière qu'il peut émettre, il est utile d'utiliser un intervalle normalisé de 0 à 1 pour ces intensités avec 0 représentant l'absence de lumière et 1 représentant l'intensité maximale. En plus du R,G,B on utilise aussi un canal alpha (A) pour représenter la transparence d'une couleur. On a donc la possibilité d'exprimer une couleur avec 128 bits (16 octets), on peut donc utiliser un `XMVECTOR`.
@@ -30,7 +36,6 @@ La pipeline de rendu représente la séquence d'étapes nécessaire pour génér
 7) *Rasterizer Stage*
 8) *Pixel Shader Stage*
 9) *Output Merger Stage*
-
 
 ## L'étape *Input Assembler*
 Cette étape est responsable de lire les données géométriques (sommets et indices) à partir de la mémoire et les utilise pour assembler des primitives géométriques (triangles, lignes...). On peut se dire qu'un sommet n'est qu'un point spécial dans une primitive géométrique mais avec *Direct3D* il peut contenir d'autres données que seulement sa position comme par exemple des normales, des coordonnées de texture, etc.
@@ -117,3 +122,22 @@ On a décrit la position et l'orientation de la caméra dans le monde mais il y 
 On peut définir un frustum dans l'espace de vue, avec le centre de projection à l'origine et orienté vers le bas de l'axe *z* positif. On définit quatre composantes : le plan de près (*near plane*) `n`, le plan de loin (*far plane*) `f`, l'angle de champs vertical (*vertical field of view angle*) `α`, et l'aspect ration `r`. Á noter que dans l'espace de vue, le *near plane* et le *far plane* sont parallèles au plan *xy*.
 
 Les coordonnées des points projetés sont calculés dans l'espace de vue. Dans l'espace de vue, la fenêtre de projection a une hauteur de 2 et une largeur de `2*r` avec `r` l'aspect ratio. Le problème avec ça est que les dimensions dependent de l'aspect ratio, cela veut dire qu'on doit dire au GPU l'aspect ratio. Il est plus pratique d'enlever cette dépendance, on peut le faire en mettant à l'échelle la coordonnée *x* projetée de l'intervalle `[-r, +r]` à `[-1, +1]`. Après cette manipulation, les coordonnées *x* et *y* sont dites **Normalized Device Coordinates** (NDC).
+
+## Les étapes de *Tessellation*
+La tessellation est le processus de subdivision de triangles d'un maillage pour ajouter des nouveaux triangles. Ces nouveaux triangles peuvent être utilisés pour augmenter le niveau de détail d'un objet.
+Il y a plusieurs avantages à l'utilisation de la tessellation : 
+- On peut par exemple implémenter un système de LOD (Level of Detail) qui utilise la tessellation pour ajuster dynamiquement le niveau de détail d'un objet en fonction de sa distance à la caméra. Un objet proche de la caméra nécessite plus de détails qu'un objet loin.
+- On peut garder un maillage *low-poly* en mémoire et ajouter des triangles à la volée ce qui permet de réduire l'impact mémoire.
+- On peut faire des animations et des simulations de physiques sur des versions *low-poly* du maillage et on utilise la tessellation pour ajouter des détails.
+Les étapes de tessellation sont nouvelles depuis DirectX 11 et elles permettent d'exécuter des opérations directement sur le GPU contrairement aux anciennes versions ou il fallait le faire sur le CPU.
+
+## L'étape de *Geometry Shader*
+Cette étape est optionnelle, elle prend en entrée les primitives géométriques. Par exemple, si on dessine une liste de triangles, le *Geometry Shader* prend en entrée les trois sommets qui définissent le triangle. L'avantage principale de ce shader est qu'il peut créer ou détruire la géométrie de manière générale. Par exemple, la primitive d'entrée peut être étendue en une ou plusieurs primitives.
+
+## *Clipping*
+La géométrie qui est complétement hors du frustum de vue doit être rejetée et la géométrie qui intersecte les frontières du frustum doit être coupée (*clipped*). Le principe de *clipping* est déjà fait par le GPU avec l'algorithme de Sutherland-Hodgman.
+
+## L'étape de rasterization
+La principal travail de cette étape est de calculer les couleurs des pixels depuis les triangles 3D projetés.
+
+Après le *clipping*, le GPU peut faire la division de perspective pour passer du *homogeneous clip space* au NDC. Quand les sommets se trouvent dans l'espace NDC, les coordonnées 2D *x* et *y* formant l'image 2D sont transformées en un rectangle sur le back buffer appelé *viewport*.
