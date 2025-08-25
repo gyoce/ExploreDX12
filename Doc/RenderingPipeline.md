@@ -15,6 +15,11 @@ Sommaire :
 - [Les étapes de *Tessellation*](#les-étapes-de-tessellation)
 - [L'étape de *Geometry Shader*](#létape-de-geometry-shader)
 - [*Clipping*](#clipping)
+- [L'étape de rasterization](#létape-de-rasterization)
+    - [Transformation du viewport](#transformation-du-viewport)
+    - [*Backface Culling*](#backface-culling)
+- [L'étape de *Pixel Shader*](#létape-de-pixel-shader)
+- [L'étape de *Output Merger*](#létape-de-output-merger)
 
 ## Couleurs
 Les écrans émettent une mixture de lumière rouge, vert et bleu pour chaque pixel. On utilise donc un modèle de couleur RGB (Red, Green, Blue) pour représenter les couleurs. Chaque écran possède une intensité maximale de lumière qu'il peut émettre, il est utile d'utiliser un intervalle normalisé de 0 à 1 pour ces intensités avec 0 représentant l'absence de lumière et 1 représentant l'intensité maximale. En plus du R,G,B on utilise aussi un canal alpha (A) pour représenter la transparence d'une couleur. On a donc la possibilité d'exprimer une couleur avec 128 bits (16 octets), on peut donc utiliser un `XMVECTOR`.
@@ -140,4 +145,14 @@ La géométrie qui est complétement hors du frustum de vue doit être rejetée 
 ## L'étape de rasterization
 La principal travail de cette étape est de calculer les couleurs des pixels depuis les triangles 3D projetés.
 
-Après le *clipping*, le GPU peut faire la division de perspective pour passer du *homogeneous clip space* au NDC. Quand les sommets se trouvent dans l'espace NDC, les coordonnées 2D *x* et *y* formant l'image 2D sont transformées en un rectangle sur le back buffer appelé *viewport*.
+### Transformation du viewport
+Après le *clipping*, le GPU peut faire la division de perspective pour passer du *homogeneous clip space* au NDC. Quand les sommets se trouvent dans l'espace NDC, les coordonnées 2D *x* et *y* formant l'image 2D sont transformées en un rectangle sur le back buffer appelé *viewport*. Après cette transformation, les coordonnés *x* et *y* sont exprimés en pixels.
+
+### *Backface Culling*
+Un triangle a deux côtés (avant et arrière). Le côté depuis lequel le vecteur normal émane est le côté avant et l'autre côté est le côté arrière. Si on a un triangle avec les sommets *v0*, *v1* et *v2*, on peut calculer `e0 = v1 - v0` et `e1 = v2 - v0`. La normale est calculée avec `n = (e0 x e1) / (e0 x e1)`. On a donc un triangle qui a ses sommets dans le sens des aiguilles d'une montre (clockwise) qui est *front facing* et l'autre côté est *back facing* (pour du *counter-clockwise*). Le processus de *backface culling* consiste à rejeter les triangles qui sont *back facing* car ils ne sont pas visibles par la caméra.
+
+## L'étape de *Pixel Shader*
+Les *Pixel Shaders* sont des programmes qu'on écrit qui seront exécutés par le GPU. Ils sont exécutés pour chaque pixel et ils utilisent les informations interpolées des sommets pour entrées afin de produire une couleur. 
+
+## L'étape de *Output Merger*
+Après que les fragments de pixels aient été générés par les *Pixel Shaders*, on passe à l'étape de *Output Merger*. Dans cette étape, il se peut que certains fragments de pixels soient rejetés en fonction de leur profondeur ou de leur transparence. Les fragments qui ne sont pas rejetés sont écrit dans le *back buffer*. 
