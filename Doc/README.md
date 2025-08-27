@@ -3,6 +3,7 @@
 Sommaire :
 - [Vue d'ensemble](Overview.md)
 - [API Windows](WindowsAPI.md)
+- [La pipeline de rendu](RenderingPipeline.md)
 - [Initialiation](Initialization.md)
 - [DirectX Math](DirectXMath.md)
-- [La pipeline de rendu](RenderingPipeline.md)
+- [Dessiner avec DirectX](DirectXDrawing.md)
