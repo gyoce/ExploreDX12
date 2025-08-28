@@ -5,6 +5,8 @@
 Sommaire : 
 - [Sommets et input layouts](#sommets-et-input-layouts)
 - [Vertex Buffer](#vertex-buffer)
+- [Index Buffer](#index-buffer)
+- [Vertex shader](#vertex-shader)
 
 ## Sommets et input layouts
 Un sommet avec *Direct3D* peut être défini par un ensemble de données en plus de ses coordonnées 3D. Pour créer un format de sommet personnalisé, il faut d'abord définir une structure qui permet de décrire les données que l'on veut. Exemple : 
@@ -185,7 +187,7 @@ mCommandList->IASetVertexBuffers(0, 1, vertexBuffers);
 ```
 Un vertex buffer restera lié à un slot d'entrée jusqu'à qu'on le change. Attention, définir le vertex buffer pour un slot d'entrée ne va pas dessiner les sommets, cela permet simplement de dire que le sommets sont prêts à être donner à la pipeline. Pour dessiner les sommets on utilise : 
 ```c++
-void ID3D12CommandList::DrawInstance(
+void ID3D12GraphicsCommandList::DrawInstance(
     UINT VertexCountPerInstance,
     UINT InstanceCount,
     UINT StartVertexLocation,
@@ -198,3 +200,117 @@ void ID3D12CommandList::DrawInstance(
 4) `StartInstanceLocation` est l'index de la première instance à dessiner, mais pour le moment on mettra 0 ici.
 
 Les deux paramètres *VertexCountPerInstance* et *StartVertexLocation* définissent un sous-ensemble continu de sommets à dessiner à partir du vertex buffer. Attention, ne pas oublier de définir comment sont dessiner les primitives avec la méthode `ID3D12GraphicsCommandList::IASetPrimitiveTopology`.
+
+## Index Buffer
+Similairement aux sommets, pour que le GPU ait accès à un tableau d'indices, ils doivent être placés dans un buffer GPU ressource (*ID3D12Resource*), on appelle ce buffer qui stocke des indices un **index buffer**. On peut réutiliser la fonction `Utils::CreateDefaultBuffer` pour créer un index buffer. Pour lier un index buffer à la pipeline de rendu, on doit d'abord créer une vue d'index buffer qui est représentée par : 
+```c++
+typedef struct D3D12_INDEX_BUFFER_VIEW
+{
+    D3D12_GPU_VIRTUAL_ADDRESS BufferLocation;
+    UINT SizeInBytes;
+    DXGI_FORMAT Format;
+} D3D12_INDEX_BUFFER_VIEW;
+```
+1) `BufferLocation` est l'adresse virtuelle de la ressource index buffer avec laquelle on veut créer une vue. On peut obtenir cette adresse grâce à la méthode `ID3D12_Resource::GetGPUVirtualAddress()`
+2) `SizeInBytes` est le nombre d'octets dans l'index buffer en commençant à partir de *BufferLocation*
+3) `Format` est le format des indices qui doit être soit `DXGI_FORMAT_R16_UINT` pour des indices sur 16 bits ou `DXGI_FORMAT_R32_UINT` pour des indices sur 32 bits.
+
+On lie un index buffer à l'étape d'*Input Assembler* avec la méthode `ID3D12CommandList::SetIndexBuffer`. Voici un petit exemple pour définir les triangles d'un cube, créer une vue et la lier à la pipeline : 
+```c++
+std::uint16_t indices[] = {
+    0, 1, 2,   0, 2, 3 // face avant
+    4, 6, 5,   4, 7, 6 // face arrière
+    4, 5, 1,   4, 1, 0 // face gauche
+    3, 2, 6,   3, 6, 7 // face droite
+    1, 5, 6,   1, 6, 2 // face du haut
+    4, 0, 3,   4, 3, 7 // face du dessous
+};
+const UINT ibByteSize = 36 * sizeof(std::uint16_t);
+ComPtr<ID3D12Resource> IndexBufferGPU = nullptr;
+ComPtr<ID3D12Resource> IndexBufferUploader = nullptr;
+IndexBufferGPU = Utils::CreateDefaultBuffer(md3dDevice.Get(), mCommandList.Get(), indices, ibByteSize, IndexBufferUploader);
+
+D3D12_INDEX_BUFFER_VIEW ibv;
+ibv.BufferLocation = IndexBufferGPU->GetGPUVirtualAddress();
+ibv.Format = DXGI_FORMAT_R16_UINT;
+ibv.SizeInBytes = ibByteSize;
+mCommandList->IASetIndexBuffer(&ibv);
+```
+Et enfin lorsqu'on utilise des indices, on doit utilise la méthode (à la place de la méthode `ID3D12GraphicsCommandList::DrawInstance`): 
+```c++
+void ID3D12GraphicsCommandList::DrawIndexedInstanced(
+    UINT IndexCountPerInstance,
+    UINT InstanceCount,
+    UINT StartIndexLocation,
+    INT BaseVertexLocation,
+    UINT StartInstanceLocation
+);
+```
+1) `IndexCountPerInstance` est le nombre d'indices à dessiner (par instance).
+2) `InstanceCount` est le nombre d'instances à dessiner, mais pour le moment on mettra 1 ici.
+3) `StartIndexLocation` est l'indice vers un élément qui marque le point d'entrée pour le début de la lecture des indices.
+4) `BaseVertexLocation` est un entier qui sera ajouté à chaque indice utilisé lors de l'appel de dessin avant que les sommets soient récupérés.
+5) `StartInstanceLocation` est l'indice de la première instance à dessiner, mais pour le moment on mettra 0 ici.
+
+## Vertex shader
+Voici un exemple d'un vertex shader basique écrit en HLSL (High Level Shading Language): 
+```hlsl
+// Buffer constant
+cbuffer cbPerObject : register(b0)
+{
+    float4x4 gWorldViewProj;
+};
+
+void VS(float3 iPosL : POSITION, float4 iColor : COLOR, out float4 oPosH : SV_POSITION, out float4 oColor : COLOR)
+{
+    // On transforme vers l'espace d'homogeneous clip
+    oPosH = mul(float4(iPosL, 1.0f), gWorldViewProj);
+
+    // On passe la couleur au pixel shader
+    oColor = iColor;
+}
+```
+Ici on peut voir que le vertex shader est la fonction qui se nomme `VS`, on peut lui donner n'importe quel nom valide. Ce vertex shader prend 4 paramètres, deux en entrée et deux en sortie. Les deux premiers paramètres forment la signature d'entrée du vertex shader et correspondent aux membres de notre structure de sommet. Les paramètres sémantiques `: POSITION` et `: COLOR` sont utilisés pour mapper les éléments de la structure de sommet aux paramètres d'entrée du vertex shader. 
+```c++
+struct Vertex {
+    XMFLOAT3 Pos; // 1
+    XMFLOAT4 Color; // 2
+};
+
+D3D12_INPUT_ELEMENT_DESC vertexDesc[] = { ... };
+
+void VS(
+    float3 iPosL : POSITION // 1
+    float4 iColor : COLOR // 2
+    ...
+)
+```
+Pour les paramètres de sortie, on y a aussi attaché des sémantiques `: SV_POSITION` et `: COLOR`, ils sont utilisés pour mapper les sorties du vertex shader vers les entrées de la prochaine étape (soit le geometry shader, soit le pixel shader). À noter que `SV_POSITION` est une sémantique spéciale (SV = system value), c'est utilisé pour désigner l'élément de sortie du vertex shader qui contient la position du sommet dans l'espace homogeneous clip. On doit attacher cette sémantique parce que le GPU doit connaitre cette valeur car elle intervient dans des opérations auxquelles les autres attributs ne participent pas comme le clipping, test de profondeur et la raatérisation. On peut réécrire le vertex shader en utilisant des structures pour la sortie comme pour l'entrée : 
+```hsls
+cbuffer cbPerObject : register(b0)
+{
+    float4x4 gWorldViewProj;
+};
+
+struct VertexIn
+{
+    float3 PosL : POSITION;
+    float4 Color : COLOR;
+};
+
+struct VertexOut
+{
+    float4 PosH : SV_POSITION;
+    float4 Color : COLOR:
+};
+
+VertexOut VS(VertexIn vin)
+{
+    VertexOut vout;
+
+    vout.PosH = mul(float4(vin.PosL, 1.0f), gWorldViewProj);
+    vout.Color = vin.Color;
+    
+    return vout;
+}
+```
