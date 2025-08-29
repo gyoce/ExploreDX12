@@ -374,3 +374,110 @@ struct ObjectConstants
 };
 ConstantBuffer<OBjectConstants> gObjConstants : register(b0);
 ```
+On peut mettre à jour les buffers constant mais pour ce faire on doit d'abord obtenir un pointeur vers les données de ressource qui peut être fait : 
+```c++
+ComPtr<ID3D12Resource> uploadBuffer;
+BYTE* mappedData = nullptr;
+uploadBuffer->Map(0, nullptr, reinterpret_cast<void**>(mappedData));
+```
+Le premier paramètre est un indice de sous-ressource qui identifie la sous ressource à mapper. Pour un buffer, la seule sous ressource c'est le buffer lui même donc on met 0. Le second paramètre est un pointeur optionnel vers une structure `D3D12_RANGE` qui décrit la portée de la mémoire à mapper, si on spécifie *null* alors on map toute la ressource. Le dernier paramètre retourne un pointeur vers les données mappées. Enfin, pour copier des données depuis la mémoire de notre système vers le buffer constant on peut simplement utiliser : 
+```c++
+memcpy(mappedData, &data, dataSizeInBytes);
+
+// Quand on a fini avec le buffer constant : 
+if (uploadBuffer != nullptr)
+    uploadBuffer->Unmap(0, nullptr);
+```
+Il peut être utile de construire un *wrapper* pour nous aider à manipuler les *upload* buffer.
+```c++
+template<typename T>
+class UploadBuffer
+{
+public:
+    UploadBuffer(ID3D12Device* device, UINT elementCount, bool isConstantBuffer) 
+        : mIsConstantBuffer(isConstantBuffer) 
+    {
+        mElementByteSize = sizeof(T);
+
+        if (isConstantBuffer)
+            mElementByteSize = Utils::CalcConstantBufferByteSize(sizeof(T));
+
+        ThrowIfFailed(
+            device->CreateCommittedResource(
+                &CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
+                D3D12_HEAP_FLAG_NONE,
+                &CD3DX12_RESOURCE_DESC::Buffer(mElementByteSize*elementCount),
+                D3D12_RESOURCE_STATE_GENERIC_READ,
+                nullptr,
+                IID_PPV_ARGS(&mUploadBuffer)
+            )
+        );
+
+        ThrowIfFailed(mUploadBuffer->Map(0, nullptr, reinterpret_cast<void**>(&mMappedData)));
+    }
+
+    UploadBuffer(const UploadBuffer& rhs) = delete;
+    UploadBuffer& operator=(const UploadBuffer& rhs) = delete;
+
+    ~UploadBuffer()
+    {
+        if (mUploadBuffer != nullptr)
+            mUploadBuffer->Unmap(0, nullptr);
+
+        mMappedData = nullptr;
+    }
+
+    ID3D12Resource* Resource() const
+    {
+        return mUploadBuffer.Get();
+    }
+
+    void CopyData(int elementIndex, const T& data)
+    {
+        memcpy(&mMappedData[elementIndex * mElementByteSize], &data, sizeof(T));
+    }
+
+private:
+    Microsoft::WRL::ComPtr<ID3D12Resource> mUploadBuffer;
+    BYTE* mMappedData = nullptr;
+    UINT mElementByteSize = 0;
+    bool mIsConstantBuffer = false;
+};
+```
+Pour rappel, on lie une ressoruce à la pipeline grâce à un objet descripteur. On a donc aussi besoin de descripteurs pour lier les buffer constants à la pipeline. Les descripteurs de buffer constant vivent dans un tas de descripteur de type `D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV`. Pour stocker ces nouveaux types de descripteurs on a besoin de créer un nouveau tas de descriptor de ce type : 
+```c++
+D3D12_DESCRIPTOR_HEAP_DESC cbvHeapDesc;
+cbvHeapDesc.NumDescriptor = 1;
+cbvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+cbvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE; 
+// Ce flag nous permet de dire que ces descripteurs seront utilisés par des programmes de shader 
+cbvHeapDesc.NodeMask = 0;
+ComPtr<ID3D12DescriptorHeap> cbvHeap;
+d3dDevice->CreateDescriptorHeap(&cbvHeapDesc, IID_PPV_ARGS(&cbvHeap));
+```
+Pour créer une vue d'un constant buffer on peut faire : 
+```c++
+struct ObjectConstants
+{
+    XMFLOAT4X4 WorldViewProj = MathUtils::Identity4x4();
+};
+
+// Buffer constant pour stocker les constantes de *n* objets
+std::unique_ptr<UploadBuffer<ObjectConstants>> mObjectCB = std::make_unique<UploadBuffer<ObjectConstants>>(md3dDevice.Get(), n, true);
+
+UINT objCBByteSize = Utils::CalcConstantBufferByteSize(sizeof(ObjectConstants));
+
+// Adresse de début de la mémoire du buffer
+D3D12_GPU_VIRTUAL_ADDRESS cbAddress = mObjectCB->Resource()->GetGPUVirtualAddress();
+
+// Offset vers le ième objet constant buffer dans le buffer
+int boxCBufIndex = i;
+cbAddress += boxCBufIndex * objCBByteSize;
+
+D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc;
+cbvDesc.BufferLocation = cbAddress;
+cbvDesc.SizeInBytes = Utils::CalcConstantBufferByteSize(sizeof(ObjectConstants));
+md3dDevice->CreateConstantBufferView(&cbvDesc, mCbvHeap->GetCPUDescriptorHandleForHeapStart());
+```
+La structure `D3D12_CONSTANT_BUFFER_VIEW_DESC` décrit un sous-ensemble de la ressource du buffer constant à lier à la structure du buffer constant de celui dans le HLSL.
+
