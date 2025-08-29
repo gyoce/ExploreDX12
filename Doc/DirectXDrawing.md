@@ -7,6 +7,8 @@ Sommaire :
 - [Vertex Buffer](#vertex-buffer)
 - [Index Buffer](#index-buffer)
 - [Vertex shader](#vertex-shader)
+- [Pixel shader](#pixel-shader)
+- [Constant buffers](#constant-buffers)
 
 ## Sommets et input layouts
 Un sommet avec *Direct3D* peut être défini par un ensemble de données en plus de ses coordonnées 3D. Pour créer un format de sommet personnalisé, il faut d'abord définir une structure qui permet de décrire les données que l'on veut. Exemple : 
@@ -286,7 +288,7 @@ void VS(
 )
 ```
 Pour les paramètres de sortie, on y a aussi attaché des sémantiques `: SV_POSITION` et `: COLOR`, ils sont utilisés pour mapper les sorties du vertex shader vers les entrées de la prochaine étape (soit le geometry shader, soit le pixel shader). À noter que `SV_POSITION` est une sémantique spéciale (SV = system value), c'est utilisé pour désigner l'élément de sortie du vertex shader qui contient la position du sommet dans l'espace homogeneous clip. On doit attacher cette sémantique parce que le GPU doit connaitre cette valeur car elle intervient dans des opérations auxquelles les autres attributs ne participent pas comme le clipping, test de profondeur et la raatérisation. On peut réécrire le vertex shader en utilisant des structures pour la sortie comme pour l'entrée : 
-```hsls
+```hlsl
 cbuffer cbPerObject : register(b0)
 {
     float4x4 gWorldViewProj;
@@ -313,4 +315,62 @@ VertexOut VS(VertexIn vin)
     
     return vout;
 }
+```
+
+## Pixel shader
+Pendant la rasterisation, les attributs de sommet générés par le vertex shader (ou le geometry shader) sont interpolés entre les pixels d'un triangle. Ces valeurs interpolées sont ensuite données au pixel shader en tant qu'entrées. Voici un exemple d'un pixel shader basique : 
+```hlsl
+struct VertexOut
+{
+    float4 PosH : SV_POSITION;
+    float4 Color : COLOR;
+};
+
+float4 PS(VertexOut pin) : SV_TARGET
+{
+    return pin.Color;
+}
+```
+Il faut noter que les entrées du pixel shader doivent matchées **exactement** les sorties du vertex shader. Le pixel shader ici renvoie une valeur de couleur en 4D.
+
+## Constant buffers
+Un tampon constant est une ressource GPU (`ID3D12Resource`) dont ses données peuvent être référencées dans un programme de shader.
+```hlsl
+cbuffer cbPerObject : register(b0)
+{
+    float4x4 gWorldViewProj;
+};
+```
+Ce code permet de définir un objet de type `cbuffer` nommé `cbPerObject`. Ici ce buffer stocke une matrice 4x4 nommé `gWorldViewProj` qui représente les matrices combinées world, view et proj utilisées pour transformer un point de l'espace local en espace homogeneous clip. Contrairement aux vertex buffer et index buffer, les buffers constant sont généralement mis à jour une fois par frame par le CPU. Par conséquent, on crée les buffers constant dans un tas d'*upload* plutôt que dans le tas default, on pourra alors mettre à jour le contenu depuis le CPU. On aura souvent besoin de plusieurs buffers constant d'un même type. Par exemple, pour le buffer `cbOerObject` qui stocke des constantes qui varient par objet, si on a *n* objet on aura alors besoin de *n* buffers constant. Voici un exemple de code qui nous permet de créer un buffer qui stocke `NumElements` buffers constant : 
+```c++
+struct ObjectConstants
+{
+    DirectX::XMFLOAT4X4 WorldViewProj = MathUtils::Identity4x4();
+};
+
+UINT elementByteSize = Utils::CalcConstantBufferByteSize(sizeof(ObjectConstants));
+ComPtr<ID3D12Resource> uploadCBuffer;
+device->CreateCommitedResource(
+    &CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD), 
+    D3D12_HEAP_FLAG_NONE,
+    &CD3DX12_RESOUCE_DESC::Buffer(elementByteSize * NumElements),
+    D3D12_RESOURCE_STATE_GENERRIC_READ,
+    nullptr,
+    IID_PPV_ARGS(&uploadCBuffer)
+);
+
+UINT Utils::CalcConstantBufferByteSize(UINT byteSize)
+{
+    // Les buffer constant doivent être multiple de la taille minimal d'allocation matérielle (généralement 256) donc on arrondi au multiple 256 du dessus.
+    return (byteSize + 255) & ~255;
+}
+```
+Avec *DirectX12* qui a introduit le shader model 5.1, il existe une syntaxe alternative pour définir un buffer constant : 
+```hlsl
+struct ObjectConstants
+{
+    float4x4 gWorldViewProj;
+    uint matIndex;
+};
+ConstantBuffer<OBjectConstants> gObjConstants : register(b0);
 ```
