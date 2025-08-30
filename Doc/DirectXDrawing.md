@@ -481,3 +481,54 @@ md3dDevice->CreateConstantBufferView(&cbvDesc, mCbvHeap->GetCPUDescriptorHandleF
 ```
 La structure `D3D12_CONSTANT_BUFFER_VIEW_DESC` décrit un sous-ensemble de la ressource du buffer constant à lier à la structure du buffer constant de celui dans le HLSL.
 
+Généralement, différent programmes de shader s'attendent à ce que différentes ressources soient liées à la pipeline de rendu avant qu'un appel de dessin soit exécuté. Les ressources sont liées à des slots de registres ou elles peuvent être accédées par les programmes de shader. Dans l'exemple précédent on a définit le registre du buffer constant par `b0`. La signature racine (*root signature*) définit les ressources que l'application va lier à la pipeline de rendu avant qu'un appel de dessin puisse être exécuté et l'endroit où ces ressource sont mappées aux registres d'entrée du shader. Une root signature est représenté par l'interface `ID3D12RootSignature`. Elle est définie par un tableau de paramètres racines qui décrivent les ressources que le shader attend pour un draw call. Un paramètre racine peut être une constantes, descripteur ou même une table de descripteur. Le code suivant crée une root signature qui a un paramètre racine qui est une table de descripteur assez grande pour y stocker un CBV (*constant buffer view*) : 
+```c++
+CD3DX12_ROOT_PARAMETER slotRootParameter[1];
+CD3DX12_DESCRIPTOR_RANGE cbvTable;
+cbvTable.Init(
+    D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 
+    1, // Nombre de descripteur dans la table
+    0 // Arguments du registre du shader de base qui sont liés à ce paramètre 
+);
+slotRootParameter[0].InitAsDescriptorTable(
+    1, // Nombre de "portée" (range)
+    &cbvTable // Pointeur vers un tableau de "portée" (range)
+);
+
+CD3DX12_ROOT_SIGNATURE_DESC rootSigDesc(1, slotRootParameter, 0, nullptr, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
+
+ComPtr<ID3DBlob> serializedRootSig = nullptr;
+ComPtr<ID3DBlob> errorBlob = nullptr;
+HRESULT hr = D3D12SerializeRootSignature(
+    &rootSigDesc,
+    D3D_ROOT_SIGNATURE_VERSION_1,
+    serializedRootSig.GetAddressOf(),
+    errorBlob.GetAddressOf()
+);
+
+ThrowIfFailed(
+    md3dDevice->CreateRootSignature(
+        0,
+        serializedRootSig->GetBufferPointer(),
+        serializedRootSig->GetBufferSize(),
+        IID_PPV_ARGS(&mRootSignature)
+    )
+);
+```
+La signature root définit seulement quelles ressource l'application va lier à la pipeline de rendu, elle ne fait pas de liaison en soit. Une fois que la root signature a été définit grâce à une *command list*, on peut s'en servir grâce à la méthode : 
+```c++
+ID3D12GraphicsCommandList::SetGraphicsRootDescriptorTable(
+    UINT RootParameterIndex,
+    D3D12_GPU_DESCRIPTOR_HANDLE BaseDescriptor 
+);
+```
+1) `RootParameterIndex` est l'indice du paramètre root que l'on veut utiliser.
+2) `BaseDescriptor` est un *handle* vers un descripteur dans le tas qui spécifie le premier descripteur dans la table à utiliser.
+
+Une fois que la root signature a été créé, on peut alors l'utiliser de la manière suivante : 
+```c++
+mCommandList->SetGraphicsRootSignature(mRootSignature.Get());
+ID3D12DescriptorHeap* descriptorHeaps[] = { mCbvHeap.Get() };
+mCommandList->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
+mCommandList->SetGraphicsRootDescriptorTable(0, cbv);
+```
