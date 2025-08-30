@@ -9,6 +9,7 @@ Sommaire :
 - [Vertex shader](#vertex-shader)
 - [Pixel shader](#pixel-shader)
 - [Constant buffers](#constant-buffers)
+- [Compilation des shaders](#compilation-des-shaders)
 
 ## Sommets et input layouts
 Un sommet avec *Direct3D* peut être défini par un ensemble de données en plus de ses coordonnées 3D. Pour créer un format de sommet personnalisé, il faut d'abord définir une structure qui permet de décrire les données que l'on veut. Exemple : 
@@ -531,4 +532,118 @@ mCommandList->SetGraphicsRootSignature(mRootSignature.Get());
 ID3D12DescriptorHeap* descriptorHeaps[] = { mCbvHeap.Get() };
 mCommandList->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
 mCommandList->SetGraphicsRootDescriptorTable(0, cbv);
+```
+
+## Compilation des shaders
+Avec *DirectX* (ou d'autre API graphique) les programmes de shader doivent être compilés. Au runtime, on peut compiler un shader avec la méthode : 
+```c++
+HRESULT D3DCompileFromFile(
+    LPCWSTR pFileName,
+    const D3D_SHADER_MACRO *pDefines,
+    ID3DInclude *pInclude,
+    LPCSTR pEntrypoint,
+    LPCSTR pTarget,
+    UINT Flags1,
+    UINT Flags2,
+    ID3DBlob **ppCode,
+    ID3DBlob **ppErrorMsgs
+);
+```
+1) `pFileName` est le nom du fichier .hlsl qui contient le source code du shader.
+2) `pDefines` est une option avancée qu'on n'utilise pas pour le moment.
+3) `pInclude` est une option avancée qu'on n'utilise pas pour le moment.
+4) `pEntrypoint` est le nom de la fonction d'entrée du shader, un fichier .hlsl peut contenir plusieurs programmes de shader (par exemple un VS et un PS).
+5) `pTarget` est une chaîne de caractère qui spécifie le type du programme de shader et la version : 
+    - *vs_5_0* / *vs_5_1* pour un vertex shader version 5.0 ou 5.1
+    - *ps_5_0* / *ps_5_1* pour un pixel shader version 5.0 ou 5.1
+    - *gs_5_0* / *gs_5_1* pour un geometry shader version 5.0 ou 5.1
+    - *hs_5_0* / *hs_5_1* pour un hull shader version 5.0 ou 5.1
+    - *ds_5_0* / *ds_5_1* pour un domain shader version 5.0 ou 5.1
+    - *cs_5_0* / *cs_5_1* pour un compute shader version 5.0 ou 5.1
+6) `Flags1` sont les flags pour spécifier comment le shader doit être compilé par exemple : 
+    - *D3DCOMPILE_DEBUG* pour compiler le shader en mode débug.
+    - *D3DCOMPILE_SKIP_OPTIMIZATION*
+7) `Flags2` sont les flags pour des effets avancés de la compilation qu'on n'utilise pas pour le moment.
+8) `ppCode` retourne un pointeur vers une structure `ID3DBlob` qui stocke le shader bytecode compilé.
+9) `ppErrorMsgs` retourne un pointeur vers une structure `ID3DBlob` qui stocke une chaîne de caractères qui contient les erreurs de compilations s'il y en a.
+
+Le type `ID3DBlob` n'est juste qu'un bloc mémoire générique qui a deux méthodes : 
+```c++
+// Retourne un void* vers les données. 
+LPVOID ID3DBlob::GetBufferPointer();
+
+// Retourne la taille en octets du buffer.
+SIZE_T ID3DBlob::GetBufferSize();
+```
+On peut implémenter une fonction qui nous permet de compiler et d'afficher les erreurs s'il y en lors de la compilation : 
+```c++
+ComPtr<ID3DBlob> Utils::CompileShader(const std::wstring& filename, const D3D_SHADER_MACRO* defines, const std::string& entrypoint, const std::string& target) 
+{
+    UINT compileFlags = 0;
+#if defined(DEBUG) || defined(_DEBUG)
+    compileFlags = D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION;
+#endif
+    HRESULT hr = S_OK;
+    ComPtr<ID3DBlob> byteCode = nullptr;
+    ComPtr<ID3DBlob> errors;
+    hr = D3DCompileFromFile(
+        filename.c_str(), 
+        defines,
+        D3D_COMPILE_STANDARD_FILE_INCLUDE,
+        entrypoint.c_str(), 
+        target.c_str(), 
+        compileFlags,
+        0,
+        &byteCode, 
+        &errors
+    );
+
+    if(errors != nullptr)
+        OutputDebugStringA((char*)errors->GetBufferPointer());
+    ThrowIfFailed(hr);
+    return byteCode;
+}
+```
+Avec un petit exemple d'appel à cette fonction : 
+```c++
+ComPtr<ID3DBlob> mvsByteCode = nullptr;
+ComPtr<ID3DBlob> mpsByteCode = nullptr;
+mvsByteCode = Utils::CompileShader(L"Shaders\color.hlsl", nullptr, "VS", "vs_5_0");
+mpsByteCode = Utils::CompileShader(L"Shaders\color.hlsl", nullptr, "PS", "ps_5_0");
+```
+On peut aussi compiler des shaders de manière *offline* à savoir lors du build de l'application ou un autre moment. Pour ce faire, on utilise l'outil *FXC* qui est fournit avec *DirectX* dont on se sert en ligne de commande. Par exemple pour compiler un vertex et un pixel shader dans un fichie `color.hlsl` avec les noms de fonctions d'entrée `VS` et `PS` on peut faire : 
+```bat
+:: /Od permet de désactiver les optimisations
+:: /Zi permet d'activer les informations de debug
+:: /T <string> permet de spécifier le type de shader et sa version
+:: /E <string> permet de spécifier le point d'entrée
+:: /Fo <string> permet de spécifier le fichier de sortie du bytecode
+:: /Fc <string> permet de spécifier le fichier de sortie de l'assemblage
+
+:: En mode debug
+fxc "color.hlsl" /Od /Zi /T vs_5_0 /E "VS" /Fo "color_vs.cso" /Fc "color_vs.asm"
+fxc "color.hlsl" /Od /Zi /T ps_5_0 /E "PS" /Fo "color_ps.cso" /Fc "color_ps.asm"
+
+:: En mode release
+fxc "color.hlsl" /T vs_5_0 /E "VS" /Fo "color_vs.cso" /Fc "color_vs.asm"
+fxc "color.hlsl" /T ps_5_0 /E "PS" /Fo "color_ps.cso" /Fc "color_ps.asm"
+```
+On a donc compilé nos shaders et généré les fichiers de bytecode mais on doit tout de même au runtime lire ces bytecode on peut donc le faire de la manière suivante : 
+```c++
+ComPtr<ID3DBlob> Utils::LoadBinary(const std::wstring& filename)
+{
+    std::ifstream fin(filename, std::ios::binary);
+    fin.seekg(0, std::ios_base::end);
+    std::ifstream::pos_type size = (int)fin.tellg();
+    fin.seekg(0, std::ios_base::beg);
+    ComPtr<ID3DBlob> blob;
+    ThrowIfFailed(D3DCreateBlob(size, blob.GetAddressOf()));
+    fin.read((char*)blob->GetBufferPointer(), size);
+    fin.close();
+    return blob;
+}
+
+// ...
+ComPtr<ID3DBlob> mvsByteCode = Utils::LoadBinary(L"Shaders\color_vs.cso");
+ComPtr<ID3DBlob> mpsByteCode = Utils::LoadBinary(L"Shaders\color_ps.cso");
 ```
