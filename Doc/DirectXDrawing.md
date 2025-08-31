@@ -10,6 +10,9 @@ Sommaire :
 - [Pixel shader](#pixel-shader)
 - [Constant buffers](#constant-buffers)
 - [Compilation des shaders](#compilation-des-shaders)
+- [Rasterizer state](#rasterizer-state)
+- [Pipeline state object](#pipeline-state-object)
+- [Structure d'aide à la géométrie](#structure-daide-à-la-géométrie)
 
 ## Sommets et input layouts
 Un sommet avec *Direct3D* peut être défini par un ensemble de données en plus de ses coordonnées 3D. Pour créer un format de sommet personnalisé, il faut d'abord définir une structure qui permet de décrire les données que l'on veut. Exemple : 
@@ -611,7 +614,7 @@ ComPtr<ID3DBlob> mpsByteCode = nullptr;
 mvsByteCode = Utils::CompileShader(L"Shaders\color.hlsl", nullptr, "VS", "vs_5_0");
 mpsByteCode = Utils::CompileShader(L"Shaders\color.hlsl", nullptr, "PS", "ps_5_0");
 ```
-On peut aussi compiler des shaders de manière *offline* à savoir lors du build de l'application ou un autre moment. Pour ce faire, on utilise l'outil *FXC* qui est fournit avec *DirectX* dont on se sert en ligne de commande. Par exemple pour compiler un vertex et un pixel shader dans un fichie `color.hlsl` avec les noms de fonctions d'entrée `VS` et `PS` on peut faire : 
+On peut aussi compiler des shaders de manière *offline* à savoir lors du build de l'application ou un autre moment. Pour ce faire, on utilise l'outil *FXC* qui est fournit avec *DirectX* dont on se sert en ligne de commande. Par exemple pour compiler un vertex et un pixel shader dans un fichier `color.hlsl` avec les noms de fonctions d'entrée `VS` et `PS` on peut faire : 
 ```bat
 :: /Od permet de désactiver les optimisations
 :: /Zi permet d'activer les informations de debug
@@ -646,4 +649,181 @@ ComPtr<ID3DBlob> Utils::LoadBinary(const std::wstring& filename)
 // ...
 ComPtr<ID3DBlob> mvsByteCode = Utils::LoadBinary(L"Shaders\color_vs.cso");
 ComPtr<ID3DBlob> mpsByteCode = Utils::LoadBinary(L"Shaders\color_ps.cso");
+```
+
+## Rasterizer state
+Si de nombreuses parties de la pipeline de rendu sont programmables, certaines ne sont que configurables. Le *Rasterizer state group* représenté par la structure `D3D12_RASTERIZER_DESC` est utilisé pour configurer l'étape de rasterisation de la pipeline.
+```c++
+typedef struct D3D12_RASTERIZER_DESC 
+{
+    D3D12_FILL_MODE FillMode; // Default: D3D12_FILL_SOLID
+    D3D12_CULL_MODE CullMode; // Default: D3D12_CULL_BACK
+    BOOL FrontCounterClockwise; // Default: false
+    INT DepthBias; // Default: 0
+    FLOAT DepthBiasClamp; // Default: 0.0f
+    FLOAT SlopeScaledDepthBias; // Default: 0.0f
+    BOOL DepthClipEnable; // Default: true
+    BOOL ScissorEnable; // Default: false
+    BOOL MultisampleEnable; // Default: false
+    BOOL AntialiasedLineEnable; // Default: false
+    UINT ForcedSampleCount; // Default: 0
+    D3D12_CONSERVATIVE_RASTERIZATION_MODE ConservativeRaster; // Default: D3D12_CONSERVATIVE_RASTERIZATION_MODE_OFF
+} D3D12_RASTERIZER_DESC;
+```
+La plupart des membres de cette structure sont utilisés pour des utilisateurs avancés, on s'intéresse essentiellement à 
+1) `FillMode` qui permet de spécifier une vision wireframe `D3D12_FILL_WIREFRAME` ou une vision solide `D3D12_FILL_SOLID`.
+2) `CullMode` qui permet de désactiver le *culling* `D3D12_CULL_NONE`, d'activer le back-facing culling `D3D12_CULL_BACK` ou le front-facing culling `D3D12_CULL_FRONT`.
+3) `FrontCounterClockwise` qui permet de spécifier si on veut que les triangles soit ordonnés en clockwise `false` pour le front-facing et les triangles ordonnés en counterclockwise pour le back-facing et l'inverse `true`.
+4) `ScissorEnable` qui permet de spécifier si on veut activer le test du ciseau `true` ou non `false`.
+Le code suivant permet de créer un rasterizer state qui active le wireframe et qui désactive le back-face culling : 
+```c++
+CD3DX12_RASTERIZER_DESC rsDesc(D3D12_DEFAULT);
+rsDesc.FillMode = D3D12_FILL_WIREFRAME;
+rsDesc.CullMode = D3D12_CULL_NONE;
+```
+
+## Pipeline state object
+On a définit plus haut comment décrire un input layout description, comment créer un vertex shader et un pixel shader et comment configurer un rasterizer state group. Cependant, on a pas encore montré comment lier ces objets à la pipeline. La plupart de ces objets qui controle l'état de la pipeline graphique sont spécifiés par un aggrégat nommé *Pipeline State Object* (PSO) qui est représenté par l'interfacec `ID3D12PipelineState`. Pour créer un PSO on doit d'abord remplir la structure : 
+```c++
+typedef struct D3D12_GRAPHICS_PIPELINE_STATE_DESC
+{ 
+    ID3D12RootSignature *pRootSignature;
+    D3D12_SHADER_BYTECODE VS;
+    D3D12_SHADER_BYTECODE PS;
+    D3D12_SHADER_BYTECODE DS;
+    D3D12_SHADER_BYTECODE HS;
+    D3D12_SHADER_BYTECODE GS;
+    D3D12_STREAM_OUTPUT_DESC StreamOutput;
+    D3D12_BLEND_DESC BlendState;
+    UINT SampleMask;
+    D3D12_RASTERIZER_DESC RasterizerState;
+    D3D12_DEPTH_STENCIL_DESC DepthStencilState;
+    D3D12_INPUT_LAYOUT_DESC InputLayout;
+    D3D12_PRIMITIVE_TOPOLOGY_TYPE PrimitiveTopologyType;
+    UINT NumRenderTargets;
+    DXGI_FORMAT RTVFormats[8];
+    DXGI_FORMAT DSVFormat;
+    DXGI_SAMPLE_DESC SampleDesc;
+} D3D12_GRAPHICS_PIPELINE_STATE_DESC;
+```
+1) `pRootSignature` est le pointeur vers la root signature à lier avec ce PSO.
+2) `VS` est le vertex shader bytecode à lier.
+3) `PS` est le pixel shader bytecode à lier.
+4) `DS` est le domain shader bytecode à lier.
+5) `HS` est le hull shader bytecode à lier.
+6) `GS` est le geometry shader bytecode à lier.
+7) `StreamOutput` est utilisé pour une technique avancée, on y mettre que des 0 ici pour le moment.
+8) `BlendState` spécifie le blend state qui configure le blending, pour le moment on y met `CD3DX12_BLEND_DESC(D3D12_DEFAULT)`.
+9) `SampleMask` est un entier sur 32 bits qui est utilisé pour activer/désactiver les échantillons (samples). Par exemple si on désactive le 5ème échantillon, alors le 5ème échantillon ne sera pas pris, cela n'a d'impact que si on utilise un multisampling avec au moins 5 échantillons. Généralement on met *0xffffffff* ici qui ne désactive rien.
+10) `RasterizerState` spécifie le rasterizer state qui configure la rasterisation.
+11) `DepthStencilState` spécifie le depth/stencil state qui configure le test de depth/stencil. Pour le moment on y spécifie `CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT)`.
+12) `InputLayout` est un input layout description qui est un tableau de `D3D12_INPUT_ELEMENT_DESC` ainsi que le nombre d'éléments dans ce tableau.
+13) `PrimitiveTopologyType` spécifie le type de topologie de la primitive : 
+    - D3D12_PRIMITIVE_TOPOLOGY_TYPE_UNDEFINED
+    - D3D12_PRIMITIVE_TOPOLOGY_TYPE_POINT
+    - D3D12_PRIMITIVE_TOPOLOGY_TYPE_LINE
+    - D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE
+    - D3D12_PRIMITIVE_TOPOLOGY_TYPE_PATCH
+14) `NumRenderTargets` est le nombre de cible de rendu qu'on utilise simultanément.
+15) `RTVFormats` est le format de la cible de rendu, c'est un tableau car on peut écrire sur différentes cibles de rendu en même temps. 
+16) `DSVFormat` est le format du depth/stencil buffer.
+17) `SampleDesc` décrit le nombre de multisample et le niveau de qualité.
+
+Après qu'on ait rempli une instance de cette structure, on peut créer un objet `ID3D12PipelineState` en utilisant la méthode `ID3D12Device::CreateGraphicsPipelineState`, voici un petit exemple : 
+```c++
+ComPtr<ID3D12RootSignature> mRootSignature;
+std::vector<D3D12_INPUT_ELEMENT_DESC> mInputLayout;
+ComPtr<ID3DBlob> mvsByteCode;
+ComPtr<ID3DBlob> mpsByteCode;
+// ...
+D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc;
+ZeroMemory(&psoDesc, sizeof(D3D12_GRAPHICS_PIPELINE_STATE_DESC));
+psoDesc.InputLayout = { mInputLayout.data(), (UINT)mInputLayout.size() };
+psoDesc.pRootSignature = mRootSignature.Get();
+psoDesc.VS = { reinterpret_cast<BYTE*>(mvsByteCode->GetBufferPointer()), mvsByteCode->GetBufferSize() };
+psoDesc.PS = { reinterpret_cast<BYTE*>(mpsByteCode->GetBufferPointer()), mpsByteCode->GetBufferSize() };
+psoDesc.RasterizerState = CD3D12_RASTERIZER_DESC(D3D12_DEFAULT);
+psoDesc.BlendState = CD3D12_BLEND_DESC(D3D12_DEFAULT);
+psoDesc.DepthStencilState = CD3D12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
+psoDesc.SampleMask = UINT_MAX;
+psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+psoDesc.NumRenderTargets = 1;
+psoDesc.RTVFormats[0] = mBackBufferFormat;
+psoDesc.SampleDesc.Count = m4xMsaaState ? 4 : 1;
+psoDesc.SampleDesc.Quality = m4xMsaaState ? (m4xMsaaQuality - 1) : 0;
+psoDesc.DSVFormat = mDepthStencilFormat;
+ComPtr<ID3D12PipelineState> mPSO;
+md3dDevice->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&mPSO));
+```
+Pas tous les rendering states sont encapsulés dans un PSO. Par exemple le viewport et le scissor rectangle sont spécifiés indépendemment. *Direct3D* est un peu comme une machine a état, les choses restent dans leur état jusqu'à ce qu'on lest change. Si on utilise différent PSO alors on doit avoir une structure similaire à : 
+```c++
+// Le reset ici spécifie le PSO initial
+mCommandList->Reset(mDirectCmdListAlloc.Get(), mPSO1.Get())
+/* Ici on dessine les objets en utilisant le PSO 1 */
+
+// On change de PSO
+mCommandList->SetPipelineState(mPSO2.Get());
+/* Ici on dessine les objets en utilisant le PSO 2 */
+
+// On change de PSO
+mCommandList->SetPipelineState(mPSO3.Get());
+/* Ici on dessine les objets en utilisant le PSO 3 */
+```
+## Structure d'aide à la géométrie
+On peut créer une structure qui regroupe un vertex et un index buffer ensemble pour définir un groupe de géométrie.
+```c++
+struct SubmeshGeometry
+{
+    UINT IndexCount = 0;
+    UINT StartIndexLocation = 0;
+    INT BaseVertexLocation = 0;
+    DirectX::BoundingBox Bounds; // Boite englobante de la géométrie de ce sous-maillage
+};
+
+struct MeshGeometry
+{
+    std::string Name;
+
+    Microsoft::WRL::ComPtr<ID3DBlob> VertexBufferCPU = nullptr;
+    Microsoft::WRL::ComPtr<ID3DBlob> IndexBufferCPU = nullptr;
+    Microsoft::WRL::ComPtr<ID3D12Resource> VertexBufferGPU = nullptr;
+    Microsoft::WRL::ComPtr<ID3D12Resource> IndexBufferGPU = nullptr;
+    Microsoft::WRL::ComPtr<ID3D12Resource> VertexBufferUploader = nullptr;
+    Microsoft::WRL::ComPtr<ID3D12Resource> IndexBufferUploader = nullptr;
+
+    // Données à propos des buffers.
+    UINT VertexByteStride = 0;
+    UINT VertexBufferByteSize = 0;
+    DXGI_FORMAT IndexFormat = DXGI_FORMAT_R16_UINT;
+    UINT IndexBufferByteSize = 0;
+
+    // Un MeshGeometry peut stocker plusieurs géométries dans vertex/index buffer.
+    // On utilise alors ce conteneur pour définir les géométries du submesh comme ça on dessine les submesh individuellement.
+    std::unordered_map<std::string, SubmeshGeometry> DrawArgs;
+
+    D3D12_VERTEX_BUFFER_VIEW VertexBufferView() const
+    {
+        D3D12_VERTEX_BUFFER_VIEW vbv;
+        vbv.BufferLocation = VertexBufferGPU->GetGPUVirtualAddress();
+        vbv.StrideInBytes = VertexByteStride;
+        vbv.SizeInBytes = VertexBufferByteSize;
+        return vbv;
+    }
+
+    D3D12_INDEX_BUFFER_VIEW IndexBufferView() const
+    {
+        D3D12_INDEX_BUFFER_VIEW ibv;
+        ibv.BufferLocation = IndexBufferGPU->GetGPUVirtualAddress();
+        ibv.Format = IndexFormat;
+        ibv.SizeInBytes = IndexBufferByteSize;
+        return ibv;
+    }
+
+    // On peut libérer la mémoire après qu'on ait fini d'upload vers le GPU.
+    void DisposeUploaders()
+    {
+        VertexBufferUploader = nullptr;
+        IndexBufferUploader = nullptr;
+    }
+};
 ```
