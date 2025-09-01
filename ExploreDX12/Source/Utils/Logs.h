@@ -96,18 +96,15 @@ namespace Logs
         }
 
         template<typename CharT>
-        inline void Output(const std::basic_string<CharT>& msg, bool error = false)
+        inline void Output(const std::basic_string<CharT>& msg)
         {
             std::string utf8msg;
             if constexpr (std::is_same_v<CharT, wchar_t>)
-                utf8msg = ToUtf8(msg);
+                utf8msg = ToUtf8(msg) + "\n";
             else
-                utf8msg = msg;
+                utf8msg = msg + "\n";
 
-            if (error)
-                std::cerr << utf8msg << "\n";
-            else
-                std::cout << utf8msg << "\n";
+            OutputDebugStringA(utf8msg.c_str());
         }
 
         inline LogContext<char> GetNewLogContext(const std::string& format)
@@ -126,16 +123,6 @@ namespace Logs
                 .Format = format.c_str(),
                 .FormatSize = static_cast<int>(format.size())
             };
-        }
-
-        inline std::string Green(const std::string& text)
-        {
-            return "\033[32m" + text + "\033[0m";
-        }
-
-        inline std::string BoldAndRed(const std::string& text)
-        {
-            return "\033[1;31m" + text + "\033[0m";
         }
     } // namespace Internal
 
@@ -157,9 +144,9 @@ namespace Logs
             Internal::FormatLog(context);
 
         if constexpr (std::is_same_v<CharT, wchar_t>)
-            Internal::Output(Internal::Green(Internal::ToUtf8(context.Stream.str())));
+            Internal::Output(Internal::ToUtf8(context.Stream.str()));
         else
-            Internal::Output(Internal::Green(context.Stream.str()));
+            Internal::Output(context.Stream.str());
 #endif
     }
 
@@ -187,9 +174,9 @@ namespace Logs
             Internal::FormatLog(context);
 
         if constexpr (std::is_same_v<CharT, wchar_t>)
-            Internal::Output(Internal::BoldAndRed(Internal::ToUtf8(context.Stream.str())), true);
+            Internal::Output(Internal::ToUtf8(context.Stream.str()));
         else
-            Internal::Output(Internal::BoldAndRed(context.Stream.str()), true);
+            Internal::Output(context.Stream.str());
 #endif
     }
 

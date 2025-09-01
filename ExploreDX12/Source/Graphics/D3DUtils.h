@@ -6,12 +6,19 @@
 #endif
 
 #include <windows.h>
+#include <windowsx.h>
 #include <wrl.h>
 #include <d3dx12/d3dx12.h>
+#include <DirectXMath.h>
+#include <DirectXColors.h>
+#include <DirectXCollision.h>
 #include <dxgi1_4.h>
 #include <string>
 #include <comdef.h>
 #include <dxgidebug.h>
+#include <d3dcompiler.h>
+
+using namespace DirectX;
 
 #include "Utils/Logs.h"
 
@@ -57,3 +64,37 @@ public:
     }                                                      \
 }
 #endif
+
+namespace D3DUtils
+{
+    inline UINT CalcConstantBufferByteSize(UINT byteSize)
+    {
+        return (byteSize + 255) & ~255;
+    }
+
+    Microsoft::WRL::ComPtr<ID3DBlob> CompileShader(const std::wstring& filename, const D3D_SHADER_MACRO* defines, const std::string& entrypoint, const std::string& target);
+
+    Microsoft::WRL::ComPtr<ID3D12Resource> CreateDefaultBuffer(ID3D12Device* device, ID3D12GraphicsCommandList* cmdList, const void* initData, UINT64 byteSize, Microsoft::WRL::ComPtr<ID3D12Resource>& uploadBuffer);
+}
+
+namespace MathUtils
+{
+    inline const float Pi = 3.1415926535f;
+
+    inline XMFLOAT4X4 Identity4x4()
+    {
+        static XMFLOAT4X4 I {
+            1.0f, 0.0f, 0.0f, 0.0f,
+            0.0f, 1.0f, 0.0f, 0.0f,
+            0.0f, 0.0f, 1.0f, 0.0f,
+            0.0f, 0.0f, 0.0f, 1.0f,
+        };
+        return I;
+    }
+
+    template<typename T>
+    inline T Clamp(const T& x, const T& low, const T& high)
+    {
+        return x < low ? low : (x > high ? high : x);
+    }
+}
