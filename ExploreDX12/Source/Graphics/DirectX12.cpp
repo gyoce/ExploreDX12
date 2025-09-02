@@ -213,16 +213,22 @@ void DirectX12::OnWindowResize()
 
 void DirectX12::FlushCommandQueue()
 {
+    // Permet "d'avancer" la barrière pour marquer les commandes jusqu'à ce point.
     CurrentFence++;
 
+    // Ajoute une instruction à la commande queue qui permet de définir un nouveau "marquage" de barrière.
+    // Permet de dire au GPU de mettre à jour la valeur de la barrière à "CurrentFence".
+    // Ne sera pas fait tant que le GPU n'aura pas fini de traiter toutes les commandes précédente à ce "Signal"
     ThrowIfFailed(CommandQueue->Signal(Fence.Get(), CurrentFence));
 
+    // Attendre jusqu'à ce que le GPU ait complété les commandes jusqu'à ce point de barrière.
     if (Fence->GetCompletedValue() < CurrentFence)
     {
+        // Création d'un event handle.
         HANDLE eventHandle = CreateEventEx(nullptr, nullptr, false, EVENT_ALL_ACCESS);
-
+        // Permet d'associer l'événement quand le GPU a atteint la valeur de fence à ce handle.
         ThrowIfFailed(Fence->SetEventOnCompletion(CurrentFence, eventHandle));
-
+        // Permet de bloquer complétement le thread CPU jusqu'à ce que l'event soit signalé
         WaitForSingleObject(eventHandle, INFINITE);
         CloseHandle(eventHandle);
     }

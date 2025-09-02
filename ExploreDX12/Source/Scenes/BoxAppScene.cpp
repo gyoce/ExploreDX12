@@ -6,6 +6,7 @@
 
 bool BoxAppScene::Initialize()
 {
+    // On réinitialise la commande liste pour préparer aux futures commande.
     ThrowIfFailed(DirectX12::CommandList->Reset(DirectX12::CommandListAllocator.Get(), nullptr));
 
     BuildDescriptorHeaps();
@@ -15,10 +16,12 @@ bool BoxAppScene::Initialize()
     BuildBoxGeometry();
     BuildPSO();
 
+    // Permet d'exécuter les commandes d'initialisation.
     ThrowIfFailed(DirectX12::CommandList->Close());
     ID3D12CommandList* cmdsLists[] = { DirectX12::CommandList.Get() };
     DirectX12::CommandQueue->ExecuteCommandLists(_countof(cmdsLists), cmdsLists);
 
+    // On attend jusqu'à ce que l'initialisation soit finie.
     DirectX12::FlushCommandQueue();
 
     return true;
@@ -26,6 +29,7 @@ bool BoxAppScene::Initialize()
 
 void BoxAppScene::OnWindowResize()
 {
+    // Quand la fenêtre est resize, on doit mettre à jour l'aspect ratio et recalculer la matrice de projection.
     XMMATRIX P = XMMatrixPerspectiveFovLH(0.25f * MathUtils::Pi, WindowManager::AspectRatio(), 1.0f, 1000.0f);
     XMStoreFloat4x4(&mProj, P);
 }
@@ -86,6 +90,7 @@ void BoxAppScene::Update()
     XMMATRIX proj = XMLoadFloat4x4(&mProj);
     XMMATRIX worldViewProj = world * view * proj;
 
+    // On met à jour le buffer constant avec la dernière matrice WorldViewProj 
     ObjectConstants objConstants;
     XMStoreFloat4x4(&objConstants.WorldViewProj, XMMatrixTranspose(worldViewProj));
     mObjectCB->CopyData(0, objConstants);
@@ -93,20 +98,25 @@ void BoxAppScene::Update()
 
 void BoxAppScene::Draw()
 {
+    // On réutilise la mémoire associée à l'enregistrement des commandes.
     ThrowIfFailed(DirectX12::CommandListAllocator->Reset());
 
+    // Une liste de commande peut être reset après qu'elle a été ajouté à la file de commande avec via ExecuteCommandList, ce qui nous permet de réutiliser la mémoire de la liste de commande.
     ThrowIfFailed(DirectX12::CommandList->Reset(DirectX12::CommandListAllocator.Get(), mPSO.Get()));
 
     DirectX12::CommandList->RSSetViewports(1, &DirectX12::ScreenViewport);
     DirectX12::CommandList->RSSetScissorRects(1, &DirectX12::ScissorRect);
 
+    // On indique une transition d'état sur l'utilisation de la ressource.
     CD3DX12_RESOURCE_BARRIER resourceBarrier = CD3DX12_RESOURCE_BARRIER::Transition(DirectX12::CurrentBackBuffer(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
     DirectX12::CommandList->ResourceBarrier(1, &resourceBarrier);
 
     D3D12_CPU_DESCRIPTOR_HANDLE bbv = DirectX12::CurrentBackBufferView();
     D3D12_CPU_DESCRIPTOR_HANDLE dsv = DirectX12::DepthStencilView();
+    // On clear le back buffer et le depth buffer.
     DirectX12::CommandList->ClearRenderTargetView(bbv, Colors::LightSteelBlue, 0, nullptr);
     DirectX12::CommandList->ClearDepthStencilView(dsv, D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 1.0f, 0, 0, nullptr);
+    // On précise les buffers sur lesquels on va dessiner.
     DirectX12::CommandList->OMSetRenderTargets(1, &bbv, true, &dsv);
 
     ID3D12DescriptorHeap* descriptorHeaps[] = { mCbvHeap.Get() };
@@ -127,13 +137,17 @@ void BoxAppScene::Draw()
     resourceBarrier = CD3DX12_RESOURCE_BARRIER::Transition(DirectX12::CurrentBackBuffer(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
     DirectX12::CommandList->ResourceBarrier(1, &resourceBarrier);
 
+    // Ici, on a fini d'enregistrer les commandes.
     ThrowIfFailed(DirectX12::CommandList->Close());
+    // On ajoute la liste de commande à la file pour qu'elle s'exécute.
     ID3D12CommandList* cmdsLists[] = { DirectX12::CommandList.Get() };
     DirectX12::CommandQueue->ExecuteCommandLists(_countof(cmdsLists), cmdsLists);
 
+    // On swap le back buffer et le front buffer.
     ThrowIfFailed(DirectX12::SwapChain->Present(0, 0));
     DirectX12::CurrentBackBufferIndex = (DirectX12::CurrentBackBufferIndex + 1) % DirectX12::SwapChainBufferCount;
 
+    // On attend que les commandes soient finies. Cette manière de faire n'est pas efficace mais est faite par soucis de simplicité.
     DirectX12::FlushCommandQueue();
 }
 
@@ -172,8 +186,7 @@ void BoxAppScene::BuildRootSignature()
     cbvTable.Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 0);
     slotRootParameter[0].InitAsDescriptorTable(1, &cbvTable);
 
-    CD3DX12_ROOT_SIGNATURE_DESC rootSigDesc(1, slotRootParameter, 0, nullptr,
-        D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
+    CD3DX12_ROOT_SIGNATURE_DESC rootSigDesc(1, slotRootParameter, 0, nullptr, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
 
     Microsoft::WRL::ComPtr<ID3DBlob> serializedRootSig = nullptr;
     Microsoft::WRL::ComPtr<ID3DBlob> errorBlob = nullptr;
@@ -183,7 +196,7 @@ void BoxAppScene::BuildRootSignature()
         Logs::Error("Error while doing D3D12SerializeRootSignature : %s", (char*)errorBlob->GetBufferPointer());
     ThrowIfFailed(hr);
 
-    ThrowIfFailed(DirectX12::D3DDevice->CreateRootSignature(0, serializedRootSig->GetBufferPointer(), serializedRootSig->GetBufferSize(),IID_PPV_ARGS(&mRootSignature)));
+    ThrowIfFailed(DirectX12::D3DDevice->CreateRootSignature(0, serializedRootSig->GetBufferPointer(), serializedRootSig->GetBufferSize(), IID_PPV_ARGS(&mRootSignature)));
 }
 
 void BoxAppScene::BuildShadersAndInputLayout()
