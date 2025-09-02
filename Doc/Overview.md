@@ -8,6 +8,9 @@ Sommaire :
 - [Depth buffering](#depth-buffering)
 - [Ressources et descripteurs](#ressources-et-descripteurs)
 - [File et liste de commande](#file-et-liste-de-commande)
+- [CPU/GPU Synchronisation](#cpugpu-synchronisation)
+- [Resource Transitions](#resource-transitions)
+
 
 ## COM
 *Component Object Model* est la technologie qui permet à DirectX d’être langage indépendant et d’être retro-compatible. Les objets COM sont comme des interfaces qui sont à peu près équivalentes à des classes C++ ou à des *shared_ptr*. 
@@ -117,3 +120,79 @@ On peut faire la même avec l'allocateur de commandes :
 HRESULT ID3D12CommandAllocator::Reset(void);
 ```
 ATTENTION : **Comme la file d'attente de commandes peut faire référence à des données dans un allocateur, l'allocateur de commandes ne doit pas être réinitialisé tant qu'on est pas sur que le GPU a fini d'exécuter toutes les commandes**
+
+## CPU/GPU Synchronisation 
+Si on suppose qu'on a une ressource *R* qui stocke la position d'une primitive que l'on veut dessiner. De plus, supposons que le CPU mette à jour les données de *R* pour y stocker des positions *p1* et ensuite ajoute une commande de dessin *C* qui référence *R* à la file de commande dans l'intention de dessiner la primitive avec les positions *p1*. L'ajout de commande à la file de commande ne block pas le CPU donc le CPU continue d'exécuter le reste des instructions. Ce serait une erreur pour le CPU de continuer d'exécuter la suite et d'écraser les données de *R* avec des positions *p2* avant que le GPU n'ait exécuté la commande *C*.
+
+Une solution possible à cette situation est de forcer le CPU à attendre que le GPU ait finit de traiter les commandes dans la queue jusqu'à un certain point de barrière. On appel ça *Flushing the command queue* à savoir vider la file d'attente de commande. On peut le faire grâce à une barrirère (*fence*) qui est représenté par l'interface `ID3D12Fence` et qui est utilisé pour synchroniser le GPU et le CPU. 
+
+L'objet barrière conserve une valeur `UINT64` qui est juste un entier pour identifier un point de barrière dans le temps. On commence à 0 et à chaque fois que l'on veut marquer un nouveau point on incrémente cet entier.
+```c++
+UINT64 CurrentFence = 0;
+
+void FlushCommandQueue()
+{
+    // Permet "d'avancer" la barrière pour marquer les commandes jusqu'à ce point.
+    CurrentFence++;
+
+    // Ajoute une instruction à la commande queue qui permet de définir un nouveau "marquage" de barrière.
+    // Permet de dire au GPU de mettre à jour la valeur de la barrière à "CurrentFence".
+    // Ne sera pas fait tant que le GPU n'aura pas fini de traiter toutes les commandes précédente à ce "Signal"
+    ThrowIfFailed(CommandQueue->Signal(Fence.Get(), CurrentFence));
+
+    // Attendre jusqu'à ce que le GPU ait complété les commandes jusqu'à ce point de barrière.
+    if (Fence->GetCompletedValue() < CurrentFence)
+    {
+        // Création d'un event handle.
+        HANDLE eventHandle = CreateEventEx(nullptr, nullptr, false, EVENT_ALL_ACCESS);
+        // Permet d'associer l'événement quand le GPU a atteint la valeur de fence à ce handle.
+        ThrowIfFailed(Fence->SetEventOnCompletion(CurrentFence, eventHandle));
+        // Permet de bloquer complétement le thread CPU jusqu'à ce que l'event soit signalé
+        WaitForSingleObject(eventHandle, INFINITE);
+        CloseHandle(eventHandle);
+    }
+}
+```
+
+## Resource Transitions
+Pour implémenter des effets de rendu, il est commun pour le GPU d'écrire dans une ressource *R* à une étape et à une étape d'après de lire depuis cette ressource *R*. Cela poserait des problèmes de lire depuis une certaine ressource si le GPU n'a pas fini d'y écrire. Pour résoudre ce problème, *Direct3D* associe un état aux ressources. Les ressources sont dans un état par défaut à leur création et c'est à l'application de dire à *Direct3D* qu'il y a une transition d'état.
+
+Par exemple, si l'on écrit dans une ressource (admettons une texture), on définit alors l'état de la texture à l'état de cible de rendu. En informant *Direct3D* de cette transition, le GPU peut prendre des mesures pour éviter les dangers avec par exemple l'attente de toutes les opérations d'écriture avant de lire depuis la ressource.
+
+Une transition de ressource est spécifiée par la définition d'un tableau de *transition resource barriers* sur la liste de commandes. Une barrière de ressource est représentée par la structure `D3D12_RESOURCE_BARRIER_DESC` mais on se sert principalement du wrapper : 
+```c++
+struct CD3DX12_RESOURCE_BARRIER : public D3D12_RESOURCE_BARRIER
+{
+    // ...
+
+    static inline CD3DX12_RESOURCE_BARRIER Transition(
+        _In_ ID3D12Resource* pResource, 
+        D3D12_RESOURCE_STATES stateBefore,
+        D3D12_RESOURCE_STATES stateAfter,
+        UINT subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES,
+        D3D12_RESOURCE_BARRIER_FLAGS flags = D3D12_RESOURCE_BARRIER_FLAG_NONE
+    )
+    {
+        CD3DX12_RESOURCE_BARRIER result;
+        ZeroMemory(&result, sizeof(result));
+        D3D12_RESOURCE_BARRIER &barrier = result;
+        result.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        result.Flags = flags;
+        barrier.Transition.pResource = pResource;
+        barrier.Transition.StateBefore = stateBefore;
+        barrier.Transition.StateAfter = stateAfter;
+        barrier.Transition.Subresource = subresource;
+        return result;
+    }
+
+    // ...
+};
+
+// Exemple : permet de dire à *Direct3D* que l'on veut que la texture qui représente l'image qu'on affiche à l'écran passe de l'état de présentation à l'état de cible de rendu.
+CD3DX12_RESOURCE_BARRIER resourceBarrier = CD3DX12_RESOURCE_BARRIER::Transition(
+    CurrentBackBuffer(),
+    D3D12_RESOURCE_STATE_PRESENT,
+    D3D12_RESOURCE_STATE_RENDER_TARGET
+);
+mCommandList->ResourceBarrier(1, &resourceBarrier);
+```
