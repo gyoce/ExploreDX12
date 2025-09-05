@@ -7,3 +7,6 @@ Sommaire :
 - [Initialiation](Initialization.md)
 - [DirectX Math](DirectXMath.md)
 - [Dessiner avec DirectX](DirectXDrawing.md)
+
+
+[Les différentes scènes créées](Scenes.md)
