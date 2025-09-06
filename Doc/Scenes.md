@@ -6,5 +6,5 @@ Sommaire :
 - [BoxApp](BoxApp.md)
 
 ## BoxApp
-La scène la plus simple qui dessine un cube ou on peut le faire tourner avec la souris.
+La scène la plus simple qui dessine un cube avec lequel on peut interagir en utilisant la souris.
 ![BoxApp](/Doc/Imgs/BoxAppScene.png)
