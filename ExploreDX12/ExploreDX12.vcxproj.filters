@@ -77,7 +77,7 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <FxCompile Include="..\Shaders\BoxApp\color.hlsl">
+    <FxCompile Include="Shaders\BoxApp\color.hlsl">
       <Filter>Shaders\BoxApp</Filter>
     </FxCompile>
   </ItemGroup>
