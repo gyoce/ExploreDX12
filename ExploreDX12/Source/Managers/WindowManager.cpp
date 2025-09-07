@@ -5,7 +5,7 @@
 
 static LRESULT WindowManagerProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
-    return WindowManager::GetInstance()->HandleEvent(hwnd, msg, wParam, lParam);
+    return WindowManager::HandleEvent(hwnd, msg, wParam, lParam);
 }
 
 WindowManager* WindowManager::sInstance = nullptr;
@@ -70,25 +70,25 @@ LRESULT CALLBACK WindowManager::HandleEvent(HWND hwnd, UINT msg, WPARAM wParam, 
     {
     case WM_DESTROY:
         PostQuitMessage(0);
-        mIsRunning = false;
+        sInstance->mIsRunning = false;
         return 0;
     case WM_SIZE:
-        mWidth = LOWORD(lParam);
-        mHeight = HIWORD(lParam);
-        mApp->OnWindowResize();
+        sInstance->mWidth = LOWORD(lParam);
+        sInstance->mHeight = HIWORD(lParam);
+        sInstance->mApp->OnWindowResize();
         return 0;
     case WM_LBUTTONDOWN:
     case WM_MBUTTONDOWN:
     case WM_RBUTTONDOWN:
-        mApp->OnMouseDown(wParam, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
+        sInstance->mApp->OnMouseDown(wParam, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
         return 0;
     case WM_LBUTTONUP:
     case WM_MBUTTONUP:
     case WM_RBUTTONUP:
-        mApp->OnMouseUp(wParam, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
+        sInstance->mApp->OnMouseUp(wParam, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
         return 0;
     case WM_MOUSEMOVE:
-        mApp->OnMouseMove(wParam, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
+        sInstance->mApp->OnMouseMove(wParam, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
         return 0;
     }
     return DefWindowProc(hwnd, msg, wParam, lParam);
@@ -124,7 +124,7 @@ void WindowManager::ReleaseCaptureMouse()
     ReleaseCapture();
 }
 
-WindowManager* WindowManager::GetInstance()
+void WindowManager::SetWindowTitle(const std::wstring& title)
 {
-    return sInstance;
+    SetWindowText(sInstance->mWindowHandle, title.c_str());
 }

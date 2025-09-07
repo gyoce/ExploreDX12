@@ -1,20 +1,19 @@
 #pragma once
 
 #include <windows.h>
+#include <string>
 
 class Application;
 
 class WindowManager
 {
 public:
-    WindowManager(Application* app);
-
     bool Initialize(HINSTANCE hInstance);
     void PollEvents();
 
     bool IsRunning() const { return mIsRunning; }
 
-    LRESULT CALLBACK HandleEvent(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
+    static LRESULT CALLBACK HandleEvent(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
     static HWND GetWindowHandle();
     static int GetWidth();
@@ -22,9 +21,11 @@ public:
     static float AspectRatio();
     static void CaptureMouse();
     static void ReleaseCaptureMouse();
-    static WindowManager* GetInstance();
+    static void SetWindowTitle(const std::wstring& title);
 
 private:
+    WindowManager(Application* app);
+
     Application* mApp = nullptr;
     bool mIsRunning = true;
     HWND mWindowHandle = nullptr;
@@ -32,5 +33,7 @@ private:
     int mHeight = 720;
 
     static WindowManager* sInstance;
+
+    friend class Application;
 };
 

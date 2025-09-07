@@ -23,6 +23,7 @@
     <ClCompile Include="Source\Graphics\D3DUtils.cpp" />
     <ClCompile Include="Source\Graphics\DirectX12.cpp" />
     <ClCompile Include="Source\Main.cpp" />
+    <ClCompile Include="Source\Managers\TimeManager.cpp" />
     <ClCompile Include="Source\Managers\WindowManager.cpp" />
     <ClCompile Include="Source\Scenes\BoxAppScene.cpp" />
   </ItemGroup>
@@ -32,6 +33,7 @@
     <ClInclude Include="Source\Graphics\DirectX12.h" />
     <ClInclude Include="Source\Graphics\MeshGeometry.h" />
     <ClInclude Include="Source\Graphics\UploadBuffer.h" />
+    <ClInclude Include="Source\Managers\TimeManager.h" />
     <ClInclude Include="Source\Managers\WindowManager.h" />
     <ClInclude Include="Source\Scenes\BoxAppScene.h" />
     <ClInclude Include="Source\Scenes\Scene.h" />
