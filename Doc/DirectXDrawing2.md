@@ -8,6 +8,7 @@ Sommaire :
 - [Pass constants](#pass-constants)
 - [Shape geometry](#shape-geometry)
     - [Le cylindre](#le-cylindre)
+    - [La sphère](#la-sphère)
 
 ## Frame Resource
 Pour rappel, le CPU et le GPU travaillent en parallèle. Le CPU prépare et soumet des listes de commandes et le GPU traite les commandes dans la file de commande. Le but est de garder le CPU et le GPU occupés pour profiter au maximum de la puissance de la machine. Jusqu'à présent, on a synchronisé le CPU et le GPU une fois par frame parce que : 
@@ -416,5 +417,106 @@ void GeometryGenerator::BuildCylinderBottomCap(float bottomRadius, float topRadi
         meshData.Indices32.push_back(baseIndex + i);
         meshData.Indices32.push_back(baseIndex + i + 1);
     }
+}
+```
+
+### La sphère
+On peut définir une sphère en spécifiant son rayon et le nombre de tranches (*slice*) et de segments (*stack*). L'algorithme pour générer une sphère est très similaire à celui du cylindre, à l'exception du rayon par anneau qui change de manière non linéaire en fonction des fonctions trigonométriques. Voici un exemple d'implémentation :
+
+![Sphère](/Doc/Imgs/Sphere.png)
+
+```c++
+GeometryGenerator::MeshData GeometryGenerator::CreateSphere(float radius, uint32 sliceCount, uint32 stackCount)
+{
+    MeshData meshData;
+
+    // Calcule les sommets en partant du pôle supérieur et en descendant les segments.
+
+    // Pour les poles il faut noter qu'il y aura une distorsion des coordonnées de texture car il n'y a pas de point unique sur la carte de texture à assigner au pôle lorsqu'on mappe une texture rectangulaire sur une sphère.
+    Vertex topVertex(0.0f, +radius, 0.0f, 0.0f, +1.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f);
+    Vertex bottomVertex(0.0f, -radius, 0.0f, 0.0f, -1.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f);
+
+    meshData.Vertices.push_back(topVertex);
+
+    float phiStep = XM_PI / stackCount;
+    float thetaStep = 2.0f * XM_PI /sliceCount;
+
+    // Calcule des sommets pour chaque anneau de segment (on ne compte pas les pôles comme des anneaux).
+    for(uint32 i = 1; i <= stackCount - 1; i++)
+    {
+        float phi = i * phiStep;
+
+        // Pour les sommets de l'anneau.
+        for(uint32 j = 0; j <= sliceCount; j++)
+        {
+            float theta = j * thetaStep;
+
+            Vertex v;
+
+            // Coordonnées sphériques vers cartésiennes
+            v.Position.x = radius * sinf(phi) * cosf(theta);
+            v.Position.y = radius * cosf(phi);
+            v.Position.z = radius * sinf(phi) * sinf(theta);
+
+            // Dérivée partielle de P par rapport à theta
+            v.TangentU.x = -radius * sinf(phi) * sinf(theta);
+            v.TangentU.y = 0.0f;
+            v.TangentU.z = +radius * sinf(phi) * cosf(theta);
+
+            XMVECTOR T = XMLoadFloat3(&v.TangentU);
+            XMStoreFloat3(&v.TangentU, XMVector3Normalize(T));
+
+            XMVECTOR p = XMLoadFloat3(&v.Position);
+            XMStoreFloat3(&v.Normal, XMVector3Normalize(p));
+
+            v.TexC.x = theta / XM_2PI;
+            v.TexC.y = phi / XM_PI;
+
+            meshData.Vertices.push_back(v);
+        }
+    }
+
+    meshData.Vertices.push_back(bottomVertex);
+
+    // Calcule des indices pour le segment du haut. 
+    // Le segment du haut a été écrit en premier dans le buffer de sommets et connecte le pôle supérieur au premier anneau.
+    for(uint32 i = 1; i <= sliceCount; i++)
+    {
+        meshData.Indices32.push_back(0);
+        meshData.Indices32.push_back(i + 1);
+        meshData.Indices32.push_back(i);
+    }
+    
+    // Calcule des indices pour les segments intérieurs.
+    // Décale les indices à l'indice du premier sommet du premier anneau. (On saute juste le sommet du pôle supérieur.)
+    uint32 baseIndex = 1;
+    uint32 ringVertexCount = sliceCount + 1;
+    for(uint32 i = 0; i < stackCount - 2; i++)
+    {
+        for(uint32 j = 0; j < sliceCount; ++j)
+        {
+            meshData.Indices32.push_back(baseIndex + i * ringVertexCount + j);
+            meshData.Indices32.push_back(baseIndex + i * ringVertexCount + j + 1);
+            meshData.Indices32.push_back(baseIndex + (i + 1) * ringVertexCount + j);
+
+            meshData.Indices32.push_back(baseIndex + (i + 1) * ringVertexCount + j);
+            meshData.Indices32.push_back(baseIndex + i * ringVertexCount + j + 1);
+            meshData.Indices32.push_back(baseIndex + (i + 1) * ringVertexCount + j + 1);
+        }
+    }
+
+    // Calcule des indices pour le segment du bas.
+    // Le segment du bas a été écrit en dernier dans le buffer de sommets et connecte le pôle inférieur au dernier anneau. Le segment du bas a été ajouté en dernier.
+    uint32 southPoleIndex = (uint32)meshData.Vertices.size()-1;
+    // Décale les indices à l'indice du premier sommet du dernier anneau.
+    baseIndex = southPoleIndex - ringVertexCount;    
+    for(uint32 i = 0; i < sliceCount; ++i)
+    {
+        meshData.Indices32.push_back(southPoleIndex);
+        meshData.Indices32.push_back(baseIndex + i);
+        meshData.Indices32.push_back(baseIndex + i + 1);
+    }
+
+    return meshData;
 }
 ```
