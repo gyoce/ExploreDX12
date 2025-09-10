@@ -520,3 +520,70 @@ GeometryGenerator::MeshData GeometryGenerator::CreateSphere(float radius, uint32
     return meshData;
 }
 ```
+
+### La géosphère
+Comme on peut le voir sur l'image concernant la sphère, tous les triangles n'ont pas une aire égale. Une géosphère approxime une sphère en utilisant des triangles avec des aires quasi égales et des longeurs de côtés similaires. 
+
+![Géosphère](/Doc/Imgs/Geosphere.png)
+
+Pour générer une géosphère, on commence par un icosaèdre (*icosahedron*), on subdivise chaque triangle et on projette les nouveaux sommets sur la sphère avec le rayon désiré. On peut répéter ce processus pour améliorer la tessellation. Voici un exemple d'implémentation : 
+```c++
+GeometryGenerator::MeshData GeometryGenerator::CreateGeosphere(float radius, uint32 numSubdivisions)
+{
+    MeshData meshData;
+    // On met une limite sur le nombre de subdivisions.
+    numSubdivisions = std::min<uint32>(numSubdivisions, 6u);
+    // Approximation d'une sphère en tesselant un icosaèdre.
+    const float X = 0.525731f;
+    const float Z = 0.850651f;
+    XMFLOAT3 pos[12] = {
+        XMFLOAT3(-X, 0.0f, Z), XMFLOAT3(X, 0.0f, Z),
+        XMFLOAT3(-X, 0.0f, -Z), XMFLOAT3(X, 0.0f, -Z),
+        XMFLOAT3(0.0f, Z, X), XMFLOAT3(0.0f, Z, -X),
+        XMFLOAT3(0.0f, -Z, X), XMFLOAT3(0.0f, -Z, -X),
+        XMFLOAT3(Z, X, 0.0f), XMFLOAT3(-Z, X, 0.0f),
+        XMFLOAT3(Z, -X, 0.0f), XMFLOAT3(-Z, -X, 0.0f)
+    };
+    uint32 k[60] = {
+        1,4,0, 4,9,0, 4,5,9, 8,5,4, 1,8,4,
+        1,10,8, 10,3,8, 8,3,5, 3,2,5, 3,7,2,
+        3,10,7, 10,6,7, 6,11,7, 6,0,11, 6,1,0,
+        10,1,6, 11,0,9, 2,11,9, 5,2,9, 11,2,7
+    };
+    meshData.Vertices.resize(12);
+    meshData.Indices32.assign(&k[0], &k[60]);
+    
+    for(uint32 i = 0; i < 12; ++i)
+        meshData.Vertices[i].Position = pos[i];
+    
+    for(uint32 i = 0; i < numSubdivisions; ++i)
+        Subdivide(meshData);
+    
+    // Projection des sommets sur la sphère et mise à l'échelle.
+    for(uint32 i = 0; i < meshData.Vertices.size(); ++i)
+    {
+        // Projection sur la sphère unité.
+        XMVECTOR n = XMVector3Normalize(XMLoadFloat3(&meshData.Vertices[i].Position));
+        XMVECTOR p = radius*n;
+        XMStoreFloat3(&meshData.Vertices[i].Position, p);
+        XMStoreFloat3(&meshData.Vertices[i].Normal, n);
+        // Calcul des coordonnées de texture à partir des coordonnées sphériques.
+        float theta = atan2f(meshData.Vertices[i].Position.z, meshData.Vertices[i].Position.x);
+        // Mise dans l'intervalle [0, 2pi].
+        if(theta < 0.0f)
+            theta += XM_2PI;
+
+        float phi = acosf(meshData.Vertices[i].Position.y / radius);
+        meshData.Vertices[i].TexC.x = theta / XM_2PI;
+        meshData.Vertices[i].TexC.y = phi / XM_PI;
+        // Dérivée partielle de P par rapport à theta
+        meshData.Vertices[i].TangentU.x = - radius * sinf(phi) * sinf(theta);
+        meshData.Vertices[i].TangentU.y = 0.0f;
+        meshData.Vertices[i].TangentU.z = + radius * sinf(phi) * cosf(theta);
+        XMVECTOR T = XMLoadFloat3(&meshData.Vertices[i].TangentU);
+        XMStoreFloat3(&meshData.Vertices[i].TangentU, XMVector3Normalize(T));
+    }
+
+    return meshData;
+}
+```
