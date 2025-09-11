@@ -1,4 +1,4 @@
-#include "Application.h"
+#include "BoxApp.h"
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, PSTR, int)
 {
@@ -9,7 +9,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, PSTR, int)
 
     try
     {
-        Application app{ hInstance };
+        BoxApp app{ hInstance };
         return app.Run();
     } 
     catch (const DxException& exception)
