@@ -248,3 +248,19 @@ D3D12_CPU_DESCRIPTOR_HANDLE DirectX12::DepthStencilView()
 {
     return DsvHeap->GetCPUDescriptorHandleForHeapStart();
 }
+
+void DirectX12::ResetCommandList()
+{
+    ThrowIfFailed(CommandList->Reset(CommandListAllocator.Get(), nullptr));
+}
+
+void DirectX12::ExecuteCommandsAndWait()
+{
+    // Permet d'exécuter les commandes d'initialisation.
+    ThrowIfFailed(CommandList->Close());
+    ID3D12CommandList* cmdsLists[] = { CommandList.Get() };
+    CommandQueue->ExecuteCommandLists(_countof(cmdsLists), cmdsLists);
+
+    // On attend jusqu'à ce que l'initialisation soit finie.
+    FlushCommandQueue();
+}

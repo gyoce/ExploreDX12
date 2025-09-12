@@ -90,6 +90,9 @@ LRESULT CALLBACK WindowManager::HandleEvent(HWND hwnd, UINT msg, WPARAM wParam, 
     case WM_MOUSEMOVE:
         sInstance->mApp->OnMouseMove(wParam, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
         return 0;
+    case WM_KEYDOWN:
+        sInstance->mApp->OnKeyDown(wParam);
+        return 0;
     }
     return DefWindowProc(hwnd, msg, wParam, lParam);
 }

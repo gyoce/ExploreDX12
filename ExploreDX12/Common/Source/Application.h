@@ -17,6 +17,7 @@ public:
     virtual void OnMouseDown(WPARAM btnState, int x, int y) {}
     virtual void OnMouseUp(WPARAM btnState, int x, int y) {}
     virtual void OnMouseMove(WPARAM btnState, int x, int y) {}
+    virtual void OnKeyDown(WPARAM wParam) {}
 
 protected:
     virtual void Update() {}
@@ -26,5 +27,5 @@ protected:
     HINSTANCE mInstanceHandle = nullptr;
     WindowManager mWindowManager { this };
     TimeManager mTimeManager{};
-    float timer = 0.0f;
+    float timer = 0.0f;    
 };

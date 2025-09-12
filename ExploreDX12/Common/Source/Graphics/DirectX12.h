@@ -46,4 +46,7 @@ namespace DirectX12
     D3D12_CPU_DESCRIPTOR_HANDLE CurrentBackBufferView();
     D3D12_CPU_DESCRIPTOR_HANDLE DepthStencilView();
 
+    void ResetCommandList();
+    void ExecuteCommandsAndWait();
+
 } // namespace DirectX12

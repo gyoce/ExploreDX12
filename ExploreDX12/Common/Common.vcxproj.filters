@@ -62,5 +62,8 @@
     <ClInclude Include="Source\Graphics\UploadBuffer.h">
       <Filter>Source\Graphics</Filter>
     </ClInclude>
+    <ClInclude Include="Source\CommonMain.h">
+      <Filter>Source</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
