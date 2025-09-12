@@ -64,17 +64,18 @@ Et le changement à faire dans la boucle principale de l'application :
 ```c++
 void App::Update()
 {
-    mCurrentFrameResourceIndex = (mCurrentFrameResourceIndex + 1) % NumFrameResources;
-    mCurrentFrameResource = mFrameResources[mCurrentFrameResourceIndex].get();
+	// On boucle circulairement sur les frame resources.
+	mCurrentFrameResourceIndex = (mCurrentFrameResourceIndex + 1) % NumFrameResources;
+	mCurrentFrameResource = mFrameResources[mCurrentFrameResourceIndex].get();
 
-    // Est-ce que le GPU a fini de traiter les commandes de la frame resource courante ? Si ce n'est pas le cas, on attend que le GPU ait fini de traiter les commandes jusqu'à cette barrière.
-    if(mCurrFrameResource->Fence != 0 && mCommandQueue->GetLastCompletedFence() < mCurrFrameResource->Fence)
-    {
-        HANDLE eventHandle = CreateEventEx(nullptr, nullptr, false, EVENT_ALL_ACCESS);
-        ThrowIfFailed(mCommandQueue->SetEventOnFenceCompletion(mCurrFrameResource->Fence, eventHandle));
-        WaitForSingleObject(eventHandle, INFINITE);
-        CloseHandle(eventHandle);
-    }
+	// Est-ce que le GPU a fini de traiter les commandes de la frame resource courante ? Si ce n'est pas le cas, on attend que le GPU ait fini de traiter les commandes jusqu'à cette barrière.
+	if (mCurrentFrameResource->Fence != 0 && mFence->GetCompletedValue() < mCurrentFrameResource->Fence)
+	{
+		HANDLE eventHandle = CreateEventEx(nullptr, nullptr, false, EVENT_ALL_ACCESS);
+		ThrowIfFailed(mFence->SetEventOnCompletion(mCurrentFrameResource->Fence, eventHandle));
+		WaitForSingleObject(eventHandle, INFINITE);
+		CloseHandle(eventHandle);
+	}
 
     // Ici on peut mettre à jour les ressources de la frame courante (comme les constant buffer par exemple).
 }
@@ -97,7 +98,7 @@ void App::Draw()
 ## Objets de rendu
 Pour dessiner un objet, on doit effectuer plusieurs choses comme la liaison de sommets et d'indices, la liaison d'objet constants, la définition du type de primitive et la spécification des paramètres de la fonction `DrawIndexedInstanced`. Cela peut être pratique de définir une structure qui permet de stocker les données dont on a besoin pour dessiner un objet. On appelle *Render Item* ou *Objet de rendu* l'ensemble des données nécessaires pour soumettre un appel de dessin à la pipeline. On peut la définir comme suit : 
 ```c++
-// Lightweight structure stores parameters to draw a shape. This will vary from app-to-app.
+// Structure légère qui stocke les paramètres pour dessiner une forme. 
 struct RenderItem
 {
     RenderItem() = default;
@@ -204,7 +205,7 @@ void App::UpdateMainPassCB()
     mMainPassCB.TotalTime = gameTimer.TotalTime();
     mMainPassCB.DeltaTime = gameTimer.DeltaTime();
 
-    UploadBuffer<PassConstants>* currentPassCB = mCurrFrameResource->PassCB.get();
+    UploadBuffer<PassConstants>* currentPassCB = mCurrentFrameResource->PassCB.get();
     currentPassCB->CopyData(0, mMainPassCB);
 }
 ```
