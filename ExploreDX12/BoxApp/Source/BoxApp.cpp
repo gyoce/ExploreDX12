@@ -9,29 +9,6 @@ BoxApp::BoxApp(HINSTANCE hInstance)
         mIsInit &= Initialize();        
 }
 
-bool BoxApp::Initialize()
-{
-    // On réinitialise la commande liste pour préparer aux futures commande.
-    ThrowIfFailed(DirectX12::CommandList->Reset(DirectX12::CommandListAllocator.Get(), nullptr));
-
-    BuildDescriptorHeaps();
-    BuildConstantBuffers();
-    BuildRootSignature();
-    BuildShadersAndInputLayout();
-    BuildBoxGeometry();
-    BuildPSO();
-
-    // Permet d'exécuter les commandes d'initialisation.
-    ThrowIfFailed(DirectX12::CommandList->Close());
-    ID3D12CommandList* cmdsLists[] = { DirectX12::CommandList.Get() };
-    DirectX12::CommandQueue->ExecuteCommandLists(_countof(cmdsLists), cmdsLists);
-
-    // On attend jusqu'à ce que l'initialisation soit finie.
-    DirectX12::FlushCommandQueue();
-
-    return true;
-}
-
 void BoxApp::OnWindowResize()
 {
     Application::OnWindowResize();
@@ -168,6 +145,22 @@ void BoxApp::Draw()
     DirectX12::FlushCommandQueue();
 }
 
+bool BoxApp::Initialize()
+{
+    DirectX12::ResetCommandList();
+
+    BuildDescriptorHeaps();
+    BuildConstantBuffers();
+    BuildRootSignature();
+    BuildShadersAndInputLayout();
+    BuildBoxGeometry();
+    BuildPSO();
+
+    DirectX12::ExecuteCommandsAndWait();
+
+    return true;
+}
+
 void BoxApp::BuildDescriptorHeaps()
 {
     D3D12_DESCRIPTOR_HEAP_DESC cbvHeapDesc;
@@ -210,7 +203,7 @@ void BoxApp::BuildRootSignature()
     HRESULT hr = D3D12SerializeRootSignature(&rootSigDesc, D3D_ROOT_SIGNATURE_VERSION_1, serializedRootSig.GetAddressOf(), errorBlob.GetAddressOf());
 
     if (errorBlob != nullptr)
-        Logs::Error("Error while doing D3D12SerializeRootSignature : %s", (char*)errorBlob->GetBufferPointer());
+        Logs::Error("Error while doing D3D12SerializeRootSignature : {}", (char*)errorBlob->GetBufferPointer());
     ThrowIfFailed(hr);
 
     ThrowIfFailed(DirectX12::D3DDevice->CreateRootSignature(0, serializedRootSig->GetBufferPointer(), serializedRootSig->GetBufferSize(), IID_PPV_ARGS(&mRootSignature)));
