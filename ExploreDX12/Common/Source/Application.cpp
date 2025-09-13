@@ -19,6 +19,7 @@ int Application::Run()
         return -1;
 
 	OnWindowResize();
+	WindowManager::FocusActiveWindow();
 
 	while (mWindowManager.IsRunning())
 	{

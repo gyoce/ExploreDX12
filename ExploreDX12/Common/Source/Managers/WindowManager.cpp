@@ -169,3 +169,9 @@ void WindowManager::SetWindowTitle(const std::wstring& title)
 {
     SetWindowText(sInstance->mWindowHandle, title.c_str());
 }
+
+void WindowManager::FocusActiveWindow()
+{
+    SetForegroundWindow(sInstance->mWindowHandle);
+    SetActiveWindow(sInstance->mWindowHandle);
+}

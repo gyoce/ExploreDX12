@@ -22,6 +22,7 @@ public:
     static void CaptureMouse();
     static void ReleaseCaptureMouse();
     static void SetWindowTitle(const std::wstring& title);
+    static void FocusActiveWindow();
 
 private:
     WindowManager(Application* app);
