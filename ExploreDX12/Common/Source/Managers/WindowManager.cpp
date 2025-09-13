@@ -77,25 +77,29 @@ LRESULT CALLBACK WindowManager::HandleEvent(HWND hwnd, UINT msg, WPARAM wParam, 
         sInstance->mHeight = HIWORD(lParam);
         if (wParam == SIZE_MINIMIZED)
         {
-            sInstance->mIsMinimzed = true;
+            sInstance->mIsMinimized = true;
             sInstance->mIsMaximized = false;
+            sInstance->mApp->OnApplicationPause();
         }
         else if (wParam == SIZE_MAXIMIZED)
         {
-            sInstance->mIsMinimzed = false;
+            sInstance->mIsMinimized = false;
             sInstance->mIsMaximized = true;
+            sInstance->mApp->OnApplicationResume();
             sInstance->mApp->OnWindowResize();
         }
         else if (wParam == SIZE_RESTORED)
         {
-            if (sInstance->mIsMinimzed)
+            if (sInstance->mIsMinimized)
             {
-                sInstance->mIsMinimzed = false;
+                sInstance->mIsMinimized = false;
+                sInstance->mApp->OnApplicationResume();
                 sInstance->mApp->OnWindowResize();
             }
             else if (sInstance->mIsMaximized)
             {
                 sInstance->mIsMaximized = false;
+                sInstance->mApp->OnApplicationResume();
                 sInstance->mApp->OnWindowResize();
             }
             else if (sInstance->mIsResizing)
@@ -110,9 +114,11 @@ LRESULT CALLBACK WindowManager::HandleEvent(HWND hwnd, UINT msg, WPARAM wParam, 
         return 0;
     case WM_ENTERSIZEMOVE:
         sInstance->mIsResizing = true;
+        sInstance->mApp->OnApplicationPause();
         return 0;
     case WM_EXITSIZEMOVE:
         sInstance->mIsResizing = false;
+        sInstance->mApp->OnApplicationResume();
         sInstance->mApp->OnWindowResize();
         return 0;
     case WM_LBUTTONDOWN:
@@ -170,8 +176,9 @@ void WindowManager::SetWindowTitle(const std::wstring& title)
     SetWindowText(sInstance->mWindowHandle, title.c_str());
 }
 
-void WindowManager::FocusActiveWindow()
+void WindowManager::FocusWindow()
 {
     SetForegroundWindow(sInstance->mWindowHandle);
     SetActiveWindow(sInstance->mWindowHandle);
+    SetFocus(sInstance->mWindowHandle);
 }

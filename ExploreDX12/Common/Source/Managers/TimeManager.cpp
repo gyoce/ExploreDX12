@@ -10,6 +10,7 @@ TimeManager::TimeManager()
     __int64 countsPerSec;
     QueryPerformanceFrequency((LARGE_INTEGER*)&countsPerSec);
     mSecondsPerCount = 1.0 / static_cast<double>(countsPerSec);
+    QueryPerformanceCounter((LARGE_INTEGER*)&mBaseTime);
 }
 
 void TimeManager::Tick()
@@ -22,7 +23,41 @@ void TimeManager::Tick()
         mDeltaTime = 0.0f;
 }
 
+void TimeManager::Resume()
+{
+    if (mPause)
+    {
+        __int64 resumeTime;
+        QueryPerformanceCounter((LARGE_INTEGER*)&resumeTime);
+        mAccumulatedPausedTime += (resumeTime - mPauseTime);
+
+        mPreviousTime = resumeTime;
+        mPauseTime = 0;
+        mPause = false;
+    }
+}
+
+void TimeManager::Pause()
+{
+    if (!mPause)
+    {
+        __int64 currTime;
+        QueryPerformanceCounter((LARGE_INTEGER*)&currTime);
+
+        mPauseTime = currTime;
+        mPause = true;
+    }
+}
+
 float TimeManager::GetDeltaTime()
 {
     return static_cast<float>(sInstance->mDeltaTime);
+}
+
+float TimeManager::GetTotalTime()
+{
+    if (sInstance->mPause)
+        return static_cast<float>( ((sInstance->mPauseTime - sInstance->mAccumulatedPausedTime) - sInstance->mBaseTime) * sInstance->mSecondsPerCount );
+    
+    return static_cast<float>(((sInstance->mCurrentTime - sInstance->mAccumulatedPausedTime) - sInstance->mBaseTime) * sInstance->mSecondsPerCount );
 }

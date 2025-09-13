@@ -22,7 +22,7 @@ public:
     static void CaptureMouse();
     static void ReleaseCaptureMouse();
     static void SetWindowTitle(const std::wstring& title);
-    static void FocusActiveWindow();
+    static void FocusWindow();
 
 private:
     WindowManager(Application* app);
@@ -30,7 +30,7 @@ private:
     Application* mApp = nullptr;
     bool mIsRunning = true;
     bool mIsMaximized = false;
-    bool mIsMinimzed = false;
+    bool mIsMinimized = false;
     bool mIsResizing = false;
     HWND mWindowHandle = nullptr;
     int mWidth = 1280;
