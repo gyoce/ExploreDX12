@@ -28,6 +28,9 @@ private:
 
     Application* mApp = nullptr;
     bool mIsRunning = true;
+    bool mIsMaximized = false;
+    bool mIsMinimzed = false;
+    bool mIsResizing = false;
     HWND mWindowHandle = nullptr;
     int mWidth = 1280;
     int mHeight = 720;

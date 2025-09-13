@@ -75,6 +75,44 @@ LRESULT CALLBACK WindowManager::HandleEvent(HWND hwnd, UINT msg, WPARAM wParam, 
     case WM_SIZE:
         sInstance->mWidth = LOWORD(lParam);
         sInstance->mHeight = HIWORD(lParam);
+        if (wParam == SIZE_MINIMIZED)
+        {
+            sInstance->mIsMinimzed = true;
+            sInstance->mIsMaximized = false;
+        }
+        else if (wParam == SIZE_MAXIMIZED)
+        {
+            sInstance->mIsMinimzed = false;
+            sInstance->mIsMaximized = true;
+            sInstance->mApp->OnWindowResize();
+        }
+        else if (wParam == SIZE_RESTORED)
+        {
+            if (sInstance->mIsMinimzed)
+            {
+                sInstance->mIsMinimzed = false;
+                sInstance->mApp->OnWindowResize();
+            }
+            else if (sInstance->mIsMaximized)
+            {
+                sInstance->mIsMaximized = false;
+                sInstance->mApp->OnWindowResize();
+            }
+            else if (sInstance->mIsResizing)
+            {
+                // Rien à faire
+            }
+            else
+            {
+                sInstance->mApp->OnWindowResize();
+            }
+        }
+        return 0;
+    case WM_ENTERSIZEMOVE:
+        sInstance->mIsResizing = true;
+        return 0;
+    case WM_EXITSIZEMOVE:
+        sInstance->mIsResizing = false;
         sInstance->mApp->OnWindowResize();
         return 0;
     case WM_LBUTTONDOWN:
