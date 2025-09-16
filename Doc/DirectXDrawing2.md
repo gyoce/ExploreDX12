@@ -9,6 +9,7 @@ Sommaire :
 - [Shape geometry](#shape-geometry)
     - [Le cylindre](#le-cylindre)
     - [La sphère](#la-sphère)
+    - [La géosphère](#la-géosphère)
 
 ## Frame Resource
 Pour rappel, le CPU et le GPU travaillent en parallèle. Le CPU prépare et soumet des listes de commandes et le GPU traite les commandes dans la file de commande. Le but est de garder le CPU et le GPU occupés pour profiter au maximum de la puissance de la machine. Jusqu'à présent, on a synchronisé le CPU et le GPU une fois par frame parce que : 
