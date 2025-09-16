@@ -125,6 +125,7 @@ void ShapesApp::Draw()
 
 	DirectX12::CommandList->SetGraphicsRootSignature(mRootSignature.Get());
 
+	// On calcule l'index du cbv de la passe en fonction de la frame resource.
 	int passCbvIndex = mPassCbvOffset + mCurrentFrameResourceIndex;
 	CD3DX12_GPU_DESCRIPTOR_HANDLE passCbvHandle = CD3DX12_GPU_DESCRIPTOR_HANDLE(mCbvHeap->GetGPUDescriptorHandleForHeapStart());
 	passCbvHandle.Offset(passCbvIndex, DirectX12::CbvSrvUavDescriptorSize);
@@ -234,7 +235,7 @@ void ShapesApp::DrawRenderItems(ID3D12GraphicsCommandList* cmdList, const std::v
 		cmdList->IASetPrimitiveTopology(ri->PrimitiveType);
 
 		UINT cbvIndex = mCurrentFrameResourceIndex * (UINT)mOpaqueRitems.size() + ri->ObjCBIndex;
-		auto cbvHandle = CD3DX12_GPU_DESCRIPTOR_HANDLE(mCbvHeap->GetGPUDescriptorHandleForHeapStart());
+		CD3DX12_GPU_DESCRIPTOR_HANDLE cbvHandle = CD3DX12_GPU_DESCRIPTOR_HANDLE(mCbvHeap->GetGPUDescriptorHandleForHeapStart());
 		cbvHandle.Offset(cbvIndex, DirectX12::CbvSrvUavDescriptorSize);
 
 		cmdList->SetGraphicsRootDescriptorTable(0, cbvHandle);
@@ -416,7 +417,7 @@ void ShapesApp::BuildRenderItems()
 	boxRitem->BaseVertexLocation = boxRitem->Geo->DrawArgs["box"].BaseVertexLocation;
 	mAllRitems.push_back(std::move(boxRitem));
 
-	auto gridRitem = std::make_unique<RenderItem>();
+	std::unique_ptr<RenderItem> gridRitem = std::make_unique<RenderItem>();
 	gridRitem->World = MathUtils::Identity4x4();
 	gridRitem->ObjCBIndex = 1;
 	gridRitem->Geo = mGeometries["shapeGeo"].get();
@@ -513,17 +514,21 @@ void ShapesApp::BuildConstantBufferViews()
 
 	UINT objCount = (UINT)mOpaqueRitems.size();
 
+	// On a besoin d'un descripteur CBV pour chaque objet de chaque frame resource.
 	for (int frameIndex = 0; frameIndex < gNumberOfFrameResources; frameIndex++)
 	{
-		auto objectCB = mFrameResources[frameIndex]->ObjectCB->Resource();
+		// On accède à la ressource de l'upload buffer d'objet constants de la frame resource actuelle.
+		ID3D12Resource* objectCB = mFrameResources[frameIndex]->ObjectCB->Resource();
 		for (UINT i = 0; i < objCount; ++i)
 		{
 			D3D12_GPU_VIRTUAL_ADDRESS cbAddress = objectCB->GetGPUVirtualAddress();
 
+			// On fait l'offset vers le ième buffer constant.
 			cbAddress += i * objCBByteSize;
 
+			// On calcule l'offset de l'objet CBV dans le tas de descripteur.
 			int heapIndex = frameIndex * objCount + i;
-			auto handle = CD3DX12_CPU_DESCRIPTOR_HANDLE(mCbvHeap->GetCPUDescriptorHandleForHeapStart());
+			CD3DX12_CPU_DESCRIPTOR_HANDLE handle = CD3DX12_CPU_DESCRIPTOR_HANDLE(mCbvHeap->GetCPUDescriptorHandleForHeapStart());
 			handle.Offset(heapIndex, DirectX12::CbvSrvUavDescriptorSize);
 
 			D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc;
@@ -536,6 +541,7 @@ void ShapesApp::BuildConstantBufferViews()
 
 	UINT passCBByteSize = D3DUtils::CalcConstantBufferByteSize(sizeof(PassConstants));
 
+	// Les trois derniers descripteurs sont des CBV de la "passe" pour chaque frame resource.
 	for (int frameIndex = 0; frameIndex < gNumberOfFrameResources; frameIndex++)
 	{
 		ID3D12Resource* passCB = mFrameResources[frameIndex]->PassCB->Resource();
