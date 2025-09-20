@@ -4,6 +4,7 @@
 
 Sommaire : 
 - [D3D12_CPU_DESCRIPTOR_HANDLE](#d3d12_cpu_descriptor_handle)
+- [D3D12_RESOURCE_BARRIER](#d3d12_resource_barrier)
 - [ID3DBlob](#id3dblob)
 - [ID3D12CommandAllocator](#id3d12commandallocator)
 - [ID3D12CommandList](#id3d12commandlist)
@@ -12,7 +13,10 @@ Sommaire :
 - [ID3D12Device](#id3d12device)
 - [ID3D12Fence](#id3d12fence)
 - [ID3D12Resource](#id3d12resource)
+- [ID3D12RootSignature](#id3d12rootsignature)
 - [IDXGISwapChain](#idxgiswapchain)
+- [Input layout](#input-layout)
+- [Pipeline State Object (PSO)](#pipeline-state-object-pso)
 - [Views / Descriptors](#views--descriptors)
 
 ## D3D12_CPU_DESCRIPTOR_HANDLE
@@ -67,10 +71,25 @@ Une barrière (*fence*) est utilisé pour synchroniser le GPU et le CPU. La *fen
 
 Permet de représenter une ressource de Direct3D 12, c'est-à-dire un tampon de mémoire dans lequel on peut stocker des données comme des sommets, des indices ou autres.
 
+## ID3D12RootSignature
+[Documentation](https://learn.microsoft.com/en-us/windows/win32/api/d3d12/nn-d3d12-id3d12rootsignature) | [Explications](/Doc/DirectXDrawing.md#root-signature)
+
+Une *root signature* est une structure qui définit les ressources que les shaders peuvent utiliser. Elle spécifie comment les ressources sont liées à la pipeline de rendu, y compris les descripteurs, les tampons de constantes et les tables de descripteurs. La *root signature* est créée avant la création du Pipeline State Object (PSO) et doit être compatible avec les shaders utilisés dans le PSO.
+
 ## IDXGISwapChain
 [Documentation](https://learn.microsoft.com/en-us/windows/win32/api/dxgi/nn-dxgi-idxgiswapchain) | [Explications](/Doc/Overview.md#swap-chain)
 
 Une chaîne d'échange (*swap chain*) est une série de tampons d'images utilisés pour afficher des images à l'écran. Généralement on parle de *front buffer* et de *back buffer* (qui ne sont que des textures). Elle nous fournit des méthodes pour redimensionner les buffers ou pour "présenter" i.e. afficher le buffer à l'écran. 
+
+## Input layout
+[Documentation](https://learn.microsoft.com/en-us/windows/win32/api/d3d12/ns-d3d12-d3d12_input_element_desc) | [Explications](/Doc/DirectXDrawing.md#sommets-et-input-layouts)
+
+Un *input layout* est une structure qui décrit la disposition des données de sommet dans un vertex buffer. On définit une structure pour nos sommets puis on crée un tableau de `D3D12_INPUT_ELEMENT_DESC` qui décrit chaque composant de la structure. Ce tableau sera utilisé lors de la création du PSO (Pipeline State Object) pour informer le GPU de la manière dont les données de sommet sont organisées.
+
+## Pipeline State Object (PSO)
+[Documentation](https://learn.microsoft.com/en-us/windows/win32/api/d3d12/ns-d3d12-d3d12_graphics_pipeline_state_desc) | [Explications](/Doc/DirectXDrawing.md#pipeline-state-object)
+
+Un Pipeline State Object (PSO) est une structure qui encapsule tous les états de la pipeline graphique. Il inclut des informations sur les shaders, le format des rendus, les états de rasterization, les états de profondeur/stencil, etc. Le PSO est créé une fois et peut être réutilisé pour dessiner plusieurs objets. On a alors un objet de type `ID3D12PipelineState` qui est créé avec la méthode `ID3D12Device::CreateGraphicsPipelineState()` et qui sera utilisé lors du rendu avec la méthode `CommandList::Reset(pCommandAllocator, pPipelineState)`.
 
 ## Views / Descriptors
 [Documentation](https://learn.microsoft.com/en-us/windows/win32/direct3d12/descriptors) | [Explications](/Doc/Overview.md#ressources-et-descripteurs)

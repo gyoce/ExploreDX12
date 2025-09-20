@@ -9,6 +9,7 @@ Sommaire :
 - [Vertex shader](#vertex-shader)
 - [Pixel shader](#pixel-shader)
 - [Constant buffers](#constant-buffers)
+    - [Root signature](#root-signature)
 - [Compilation des shaders](#compilation-des-shaders)
 - [Rasterizer state](#rasterizer-state)
 - [Pipeline state object](#pipeline-state-object)
@@ -485,6 +486,7 @@ md3dDevice->CreateConstantBufferView(&cbvDesc, mCbvHeap->GetCPUDescriptorHandleF
 ```
 La structure `D3D12_CONSTANT_BUFFER_VIEW_DESC` décrit un sous-ensemble de la ressource du buffer constant à lier à la structure du buffer constant de celui dans le HLSL.
 
+### Root signature
 Généralement, différent programmes de shader s'attendent à ce que différentes ressources soient liées à la pipeline de rendu avant qu'un appel de dessin soit exécuté. Les ressources sont liées à des slots de registres ou elles peuvent être accédées par les programmes de shader. Dans l'exemple précédent on a définit le registre du buffer constant par `b0`. La signature racine (*root signature*) définit les ressources que l'application va lier à la pipeline de rendu avant qu'un appel de dessin puisse être exécuté et l'endroit où ces ressource sont mappées aux registres d'entrée du shader. Une root signature est représenté par l'interface `ID3D12RootSignature`. Elle est définie par un tableau de paramètres racines qui décrivent les ressources que le shader attend pour un draw call. Un paramètre racine peut être une constantes, descripteur ou même une table de descripteur. Le code suivant crée une root signature qui a un paramètre racine qui est une table de descripteur assez grande pour y stocker un CBV (*constant buffer view*) : 
 ```c++
 CD3DX12_ROOT_PARAMETER slotRootParameter[1];
