@@ -12,3 +12,4 @@ Sommaire :
 - [DirectX Math](DirectXMath.md)
 - [Dessiner avec DirectX](DirectXDrawing.md)
 - [Dessiner avec DirectX Partie 2](DirectXDrawing2.md)
+- [Éclairage](Lighting.md)
