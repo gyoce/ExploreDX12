@@ -7,6 +7,8 @@ Sommaire :
 - [Vecteurs normaux](#vecteurs-normaux)
     - [Calcul des vecteurs normaux](#calcul-des-vecteurs-normaux)
     - [Transformation des vecteurs normaux](#transformation-des-vecteurs-normaux)
+- [Vecteurs importants pour l'éclairage](#vecteurs-importants-pour-léclairage)
+- [La loi des cosinus de Lambert](#la-loi-des-cosinus-de-lambert)
 
 ## Interaction entre la lumière et les matériaux
 Quand on utilise de l'éclairage, on ne précise plus la couleur de chaque sommet directement mais on précise des matériaux et des lumières puis on applique une formule pour calculer la couleur finale de chaque pixel en fonction de la lumière et du matériau. Les matériaux peuvent être vu comme des propriétés qui définissent comment la lumière intéragit avec la surface d'un objet. Par exemple, la couleur de la lumière que la surface réfléchit et absorbe, l'indice de refraction du matériau sous la surface, combien la surface est lisse ou combien la surface est transparente.
@@ -71,3 +73,21 @@ static XMMATRIX InverseTranspose(CXMMATRIX M)
 }
 ```
 Ici on se débarrasse de la partie translation de la matrice de transformation en mettant la dernière ligne à $`(0,0,0,1)`$ parce que on utilise la transposée inverse pour transformer les vecteurs et que la translation s'applique uniquement sur les points.
+
+## Vecteurs importants pour l'éclairage
+![Vecteurs importants pour l'éclairage](/Doc/Imgs/LightingVectors.png)
+
+Soit $`E`$ la position de l'oeil, $`p`$ le point que l'oeil voit le long de la ligne de visée définie par le vecteur unitaire $`v`$. Au point $`p`$, la surface a une normale $`n`$ et le point est frappé par un rayon lumineux se déplaçant dans la direction incidente $`I`$. 
+
+Le vecteur lumière $`L`$  est le vecteur unitaire qui cible la direction opposée du rayon lumineux frappant le point de surface. Si on calcule la loi des cosinus de Lambert (*lambert's Cosine Law*), le vecteur $`L`$ est utilisé pour calculer $`L \cdot n = cos(\theta_i)`$ avec $`\theta_i`$ qui est l'angle entre $`L`$ et $`n`$. 
+
+Le vecteur de réflexion $`r`$ est la réflexion du vecteur de lumière incidente par rapport à la normale de surface $`n`$. Le vecteur de vue (*view vector* / *to-eye vector*) $`v = \text{normalize}(E - p)`$ est le vecteur unitaire du point de la surface $`p`$ vers l'oeil $`E`$. 
+
+Le vecteur de réflexion est donné par $`r = I - 2(I \cdot n)n`$, on assume ici que $`n`$ est un vecteur unitaire. Cependant, on peut se servir de la fonction HLSL `reflect(I, n)` pour calculer le vecteur de réflexion (qui nous donne donc $`r`$).
+
+## La loi des cosinus de Lambert
+On peut voir la lumière comme une collection de photons voyageant à travers l'espace dans une certaine direction. Chaque photon transporte une certaine quantité d'énergie lumineuse. La quantité d'énergie (lumineuse) émise par seconde est appelé flux énergétique (*radiant flux*). La densité de flux énergétique par unité de surface (appelé irradiance) est importante parce qu'elle va déterminer la quantité d'énergie lumineuse qui frappe une surface. 
+
+La lumière qui frappe une surface de plein fouet (i.e. $`L`$ est égal au vecteur normal $`n`$) est plus intense que la lumière qui effleure une surface avec un angle. Si l'on considère un petit faisceau lumineux de largeur $`A_1`$ traversé par un flux énergétique $`P`$. Si on cible ce faisceau sur une surface de plein fouet, alors le faisceau lumineux frappe une surface de largeur $`A_1`$ et l'irradiance est donc $`E_1 = \frac{P}{A_1}`$. Maintenant si on incline le faisceau lumineux pour qu'il frappe la surface avec un certain angle, alors le faisceau lumineux va frapper une surface plus grande $`A_2`$ et l'irradiance devient $`E_2 = \frac{P}{A_2}`$. Par trigonométrie, $`A_1`$ et $`A_2`$ sont liés par : $`cos(\theta) = \frac{A_1}{A_2}`$ ou $`\frac{1}{A_2} = \frac{cos(\theta)}{A_1}`$. On peut donc écrire : $`E_2 = \frac{P}{A_2} = \frac{P}{A_1} \cdot cos(\theta) = E_1 \cdot cos(\theta) = E_1(n \cdot L)`$.
+
+En d'autre termes, l'irradiance qui touche la zone $`A_2`$ est égal à l'irradiance à la zone $`A_1`$ perpendiculaire à la direction de la lumière mise à l'échelle par $`n \cdot L = cos(\theta)`$. C'est ce qu'on appelle la loi des cosinus de Lambert. Attention, pour le cas ou la lumière frappe la surface par en dessous (i.e. un produit scalaire négatif), on *clamp* le résultat avec la fonction *max* : $`f(\theta) = \text{max}(cos(\theta), 0) = \text{max}(n \cdot L, 0)`$
