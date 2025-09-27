@@ -10,6 +10,10 @@ Sommaire :
 - [Vecteurs importants pour l'éclairage](#vecteurs-importants-pour-léclairage)
 - [La loi des cosinus de Lambert](#la-loi-des-cosinus-de-lambert)
 - [Éclairage diffus](#éclairage-diffus)
+- [Éclairage ambiant](#éclairage-ambiant)
+- [Éclairage spéculaire](#éclairage-spéculaire)
+    - [Effet de Fresnel](#effet-de-fresnel)
+    - [La rugosité](#la-rugosité)
 
 ## Interaction entre la lumière et les matériaux
 Quand on utilise de l'éclairage, on ne précise plus la couleur de chaque sommet directement mais on précise des matériaux et des lumières puis on applique une formule pour calculer la couleur finale de chaque pixel en fonction de la lumière et du matériau. Les matériaux peuvent être vu comme des propriétés qui définissent comment la lumière intéragit avec la surface d'un objet. Par exemple, la couleur de la lumière que la surface réfléchit et absorbe, l'indice de refraction du matériau sous la surface, combien la surface est lisse ou combien la surface est transparente.
@@ -99,3 +103,48 @@ Considérons un objet opaque. Quand la lumière frappe un point sur la surface, 
 Pour le calcul de l'éclairage diffus, on précise une couleur de lumière et une couleur d'albedo (couleur diffuse). L'albedo spécifie la quantité de lumière entrante que la surface réfléchit. Par exemple, supposons qu'un point sur la surface réfléchisse 50% de la lumière rouge, 100% de la lumière verte et 75% de la lumière bleue et que la couleur de la lumière entrante est de 80% d'intensité blanche. On a alors $`B_L = (0.8, 0.8, 0.8)`$ et l'albedo $`m_d = (0.5, 1.0, 0.75)`$. Alors la quantité de lumière réfléchie est donné par : $`c_d = B_L \cdot m_d = (0.8, 0.8, 0.8) \otimes (0.5, 1.0, 0.75) = (0.4, 0.8, 0.6)`$. 
 
 Attention, cela ne suffit pas pour la rendre correcte, il faut inclure la loi des cosinus de Lambert. On a $`B_L`$ qui représente la quantité de lumière entrante, $`m_d`$ qui est l'albedo, $`L`$ le vecteur lumière et $`n`$ la normale à la surface. Alors la quantité de lumière diffus réfléchie par la surface est donnée par : $`c_d = \text{max}(L \cdot n) \cdot B_L \otimes m_d`$.
+
+## Éclairage ambiant
+Dans le monde réel, la plupart de la lumière qu'on voit est indirecte. Pour en quelque sorte simuler cette lumière indirecte, on introduit un terme d'éclairage ambiant à l'équation de la lumière : $`c_a = A_L \otimes m_d`$. La couleur $`A_L`$ spécifie la quantité totale de lumière (ambiante) indirecte qu'une surface reçoit. Elle peut être différente de la lumière émise par la source à cause de l'absorption qui s'est produit lorsque la lumière rebondi sur d'autres surfaces. L'albedo diffus $`m_d`$ spécifie la quantité de lumière incidente que la surface réfléchit.
+
+## Éclairage spéculaire
+On utilise l'éclaire diffus pour modéliser la réflexion diffuse, où la lumière pénètre dans un milieu, rebondit, une partie est absorbée et le reste est diffusé hors du milieu dans toutes les directions. Un second type de reflection survient à cause de l'effet de Fresnel qui est un phénomène physique. Quand la lumière atteint l'interface entre deux milieux ayants des indices de réfraction différents, un peu de lumière est réfléchie et le reste est réfractée. L'indice de réfraction est une propriété physique d'un milieu qui est le rapport entre la vitesse de la lumière dans le vide et la vitesse de la lumière dans le milieu. 
+
+![Effet de Fresnel](/Doc/Imgs/FresnelEffect.png)
+(a) L'effet de Fresnel pour un miroir parfaitement plat avec une normale $`n`$. La lumière incidente $`I`$ est divisée : une partie est réfléchie dans la direction $`r`$ et l'autre partie est réfractée dans la direction $`t`$. Tous ces vecteurs sont dans le même plan. L'angle entre le vecteur de reflexion et la normale est toujours $`\theta_i`$ et qui est le même que l'angle entre le vecteur lumière $`L = -I`$ et la normale $`n`$. L'angle $`\theta_t`$ entre le vecteur de réfraction et $`-n`$ dépend des indices de réfraction entre les deux milieux.
+
+(b) La plupart des objets ne sont pas des miroirs parfaitement plats mais ont une certaine rugosité microscopique. Cela provoque la diffusion de la lumière réfléchie et réfractée autour des vecteurs de réflexion et de réfraction.
+
+Pour des objets opaques, la lumière réfractée entre dans le milieu et subit une réflectance diffuse. On a donc la quantité de lumière qui se réflète sur une surface et atteint l'oeil est une combinaison de la lumière réfléchie (diffuse) par le coprs et de réflexion spéculaire. Contrairement à la lumière diffuse, la lumière spéculaire peut ne pas atteindre l'oeil car elle se reflète dans une direction spécifique. Le calcul de l'éclairage spéculaire dépend donc de la position de l'oeil.
+
+### Effet de Fresnel
+Considérons une surface plane avec une normale $`n`$ qui sépare deux milieux avec des indices de réfraction différents. Á cause de la discontinuité de l'indice de réfraction à la sur face, quand la lumière frappe la surface, une partie de celle-ci est réfléchie et une autre partie est réfractée dans la surface. Les équations de Fresnel décrivent le pourcentage de lumière entrante qui est réfléchie $`0 \leqslant R_F \leqslant 1`$. Par conservation d'énergie, si $`R_F`$ est la quantité de lumière réfléchie, alors $`1 - R_F`$ est la quantité de lumière réfractée. La valeur $`R_F`$ est un vecteur RGB parce que la quantité de réflection dépend de la couleur de la lumière. 
+
+La quantité de lumière réfléchie du milieu mais aussi de l'angle d'incidence $`\theta_i`$ entre le vecteur lumière $`L`$ et la normale $`n`$. Les équations de Fresnel sont plutôt complexes, on utilise plutôt l'approximation de Schlick : $`R_F(\theta_i) = R_F(0^{\circ}) + (1 - R_F(0^{\circ}))(1 - cos(\theta_i))^5`$ avec $`R_F(0^{\circ})`$ qui est une propriété du milieu. Par exemple :
+| Milieu           | $R_F(0^{\circ})$   |
+|------------------|--------------------|
+| Eau              | (0.02, 0.02, 0.02) |
+| Verre            | (0.08, 0.08, 0.08) |
+| Plastique        | (0.05, 0.05, 0.05) |
+| Or               | (1.00, 0.71, 0.29) |
+| Argent           | (0.95, 0.93, 0.88) |
+| Cuivre           | (0.95, 0.64, 0.54) |
+
+![Effet de Fresnel 2](/Doc/Imgs/FresnelEffect2.png)
+
+La quantité de reflection augmente quand l'angle d'incidence se rapproche de 90 degrés. Si on regarde vers le bas (a), on voit principalement le fond de l'eau parce que la lumière provenant de l'environnement qui se reflète dans notre oeil forme un petit angle $`\theta_i`$ proche de 0 degré, la réflection est alors faible et par conservation d'énergie, la réfraction est élevée. A contrario, si on regarde l'eau à un angle rasant (b), on voit principalement la réflection de l'environnement parce que la lumière qui se reflète dans notre oeil forme un grand angle $`\theta_i`$ proche de 90 degrés, la réflection est alors élevée et par conservation d'énergie, la réfraction est faible. Ce comportement est souvent appelé l'**effet de Fresnel**.
+
+### La rugosité
+Les objets réfléchissants dans le monde réel ne sont généralement pas des miroirs parfaits. Même si la surface de l'objet semble lisse à l'oeil nu, elle a souvent une certaine rugosité microscopique. Quand la rugosité augmente, la direction des micro-normales varie plus, ce qui provoque la diffusion de la lumière réfléchie en un lobe spéculaire. Pour modéliser la rugosité mathématiquement, on emploie le modèle de micro-facettes, on modélise la surface microscopique comme une collection de petits éléments plats qu'on appelle des micro-facettes. Les micro-normales sont les normales de ces micro-facettes. 
+
+Pour une vue donnée $`v`$ et un vecteur lumière $`L`$, on veut savoir la fraction de micro-facettes qui réfléchissent la lumière $`L`$ dans la direction $`v`$. Autrement dit, la fraction de micro-facettes avec une normale $`h = \text{normalize}(L + v)`$. Cela nous donnera l'indication de la quantité de lumière réfléchit dans l'oeil depuis la réflection spéculaire. Plus il ya de micro-facettes qui réfléchissent $`L`$ dans la direction $`v`$, plus la lumière spéculaire perçue par l'oeil sera intense.
+
+![Micro-facettes](/Doc/Imgs/Microfacets.png)
+Le vecteur $`h`$ est appelé le vecteur demi (*halfway vector*). On introduit aussi l'angle $`\theta_h`$ entre le halfway vecteur $`h`$ et la macro-normale $`n`$. 
+
+On définit une fonction de distribution normalisée $`\rho(\theta_h) \in [0, 1]`$ pour designer la fraction de micro-facettes dont les normales $`h`$ forment un angle $`\theta_h`$ avec la macro-normale $`n`$. Intuitivement, on s'attend à ce que $`\rho(\theta_h)`$ soit maximale quand $`\theta_h = 0^{\circ}`$. C'est-à-dire qu'on s'attend à ce que les normales des micro-facettes soient biaisées vers la macro-normale mais aussi à mesure que $`\theta_h`$ augmente (à mesure que $`h`$ diverge de $`n`$), on s'attend à ce que la fraction de micro-facettes avec la normale $`h`$ diminue. On utilise souvent la fonction $`\rho(\theta_h) = cos^m(\theta_h) = cos^m(n \cdot h)`$. Ici $`m`$ contrôle la rugosité, à mesure que $`m`$ diminue, la surface devient plus rugueuse et a contrario, à mesure que $`m`$ augmente, la surface devient plus lisse.
+
+On peut combiner $`\rho(\theta_h)`$ avec un facteur de normalisation pour obtenir une nouvelle fonction qui modélise la quantité de réflexion spéculaire de la lumière en fonction de la rugosité : $`S(\theta_h) = \frac{m+8}{8}cos^m(\theta_h) = \frac{m+8}{8}(n \cdot h)^{m}`$. Pour un $`m`$ petit, la surface est rugueuse et le lobe spéculaire s'élargit parce que l'énergie lumineuse est dispersée et inversement.
+
+On peut combiner la réflexion de Fresnel avec la rugosité de la surface. On essaye de calculer la quantité de lumière qui est réfléchie dans la direction de vue $`v`$. Soit $`\alpha_h`$ l'angle entre le vecteur lumière et le halfway vecteur $`h`$, alors $`R_F(\alpha_h)`$ nous donne la quantité de lumière réfléchie entre $`h`$ et $`v`$. En multipliant la quantité de lumière réfléchie $`R_F(\alpha_h)`$ due à l'effet de Fresnel par la quantité de lumière réfléchie due à la rugosité $`S(\theta_h)`$, on obtient la quantité de lumière réfléchie spéculaire. Soit $`(\text{max}(L \cdot n, 0) \cdot B_L)`$ qui représente la quantité de lumière incidente qui frappe la surface en un point. Alors la fraction de $`(\text{max}(L \cdot n, 0) \cdot B_L)`$ réfléchie de manière spéculaire dans l'oeil en raison de la rugosité et de l'effet de Fresnel est donnée par : \
+$`c_s = \text{max}(L \cdot n, 0) \cdot B_L \otimes R_F(\alpha_h) \frac{m + 8}{8}(n \cdot h)^{m}`$
