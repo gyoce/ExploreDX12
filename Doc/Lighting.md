@@ -16,6 +16,10 @@ Sommaire :
     - [La rugosité](#la-rugosité)
 - [Récapitulatif](#récapitulatif)
 - [Matériaux](#matériaux)
+- [Lumières parallèles](#lumières-parallèles)
+- [Points lumineux](#points-lumineux)
+    - [Atténuation](#atténuation)
+- [Projecteurs](#projecteurs)
 
 ## Interaction entre la lumière et les matériaux
 Quand on utilise de l'éclairage, on ne précise plus la couleur de chaque sommet directement mais on précise des matériaux et des lumières puis on applique une formule pour calculer la couleur finale de chaque pixel en fonction de la lumière et du matériau. Les matériaux peuvent être vu comme des propriétés qui définissent comment la lumière intéragit avec la surface d'un objet. Par exemple, la couleur de la lumière que la surface réfléchit et absorbe, l'indice de refraction du matériau sous la surface, combien la surface est lisse ou combien la surface est transparente.
@@ -284,11 +288,289 @@ void DrawRenderItems(ID3D12GraphicsCommandList* cmdList, const std::vector<Rende
         cmdList->IASetIndexBuffer(&ri->Geo->IndexBufferView());
         cmdList->IASetPrimitiveTopology(ri->PrimitiveType);
         D3D12_GPU_VIRTUAL_ADDRESS objCBAddress = objectCB->GetGPUVirtualAddress() + ri->ObjCBIndex*objCBByteSize;
-        D3D12_GPU_VIRTUAL_ADDRESS matCBAddress = matCB->GetGPUVirtualAddress() + ri->Mat->MatCBIndex*matCBByteSize;
+        D3D12_GPU_VIRTUAL_ADDRESS matCBAddress = matCB->GetGPUVirtualAddress() + ri->Mat->MatCBIndex*matCBByteSize; // Nouveau
         cmdList->SetGraphicsRootConstantBufferView(0, objCBAddress);
-        cmdList->SetGraphicsRootConstantBufferView(1, matCBAddress);
+        cmdList->SetGraphicsRootConstantBufferView(1, matCBAddress); // Nouveau
         cmdList->DrawIndexedInstanced(ri->IndexCount, 1, ri->StartIndexLocation, ri->BaseVertexLocation, 0);
     }
 }
 ```
 On rappelle qu'on a besoin des vecteurs normaux à chaque point de la surface d'un maillage triangulé ce qui nous permet de déterminer l'angle auquel la lumière frappe la surface. Pour obtenir une approximation des normales de surface en chaque point, on spécifie les normales sur chaque sommet. Ces normales seront alors interpolées à travers le triangle pendant la rasterisation.
+
+## Lumières parallèles
+Une lumière parallèle (ou lumière directionnelle) approxime une source de lumière très éloignée. On peut donc approximer tous les rayons lumineux comme étant parallèles. De plus, comme la source lumineuse est très éloignée, on peut ignorer les effets de distance et supposer que l'intensité lumineuse est constante partout. Une source lumineuse parallèle est définie par un vecteur qui spécifie la direction que les rayons lumineux parcourent. Le vecteur lumière pointe vers la direction opposée.
+
+## Points lumineux
+Un bon exemple de point lumineux est une ampoule. Elle rayonne de manière sphérique dans toutes les directions. En particulier, pour un point arbitraire $`P`$, il existe un rayon lumineux provenant du point lumineux $`Q`$ et se déplaçant vers le point. On définit encore le vecteur lumière allant dans la direction opposée i.e. la direction allant du point $`P`$ vers le point source de lumière $`Q`$ : $`L = \frac{Q - P}{\|Q - P\|}`$. La différence principale entre un point lumineux et une lumière parallèle est la manière de calculer le vecteur lumière $`L`$.
+
+### Atténuation
+Physiquement, l'intensité lumineuse diminue en fonction de la distance selon la loi de l'inverse du carré. On peut donc définir l'intensité lumineuse à un point de distance $`d`$ de la source lumineuse comme : $`I = \frac{I_0}{d^2}`$ avec $`I_0`$ qui est l'intensité lumineuse à une distance $`d = 1`$ de la source lumineuse. Cela fonctionne bien pour des lumières réelles mais il existe une formule plus simple que l'on peut utiliser qui est une fonction de décroissante linéaire : $`\text{att}(d) = \text{saturate}(\frac{\text{falloffEnd} - d}{\text{falloffEnd} - \text{falloffStart}})`$, avec la fonction $`\text{saturate}(x)`$ qui vaut $`x`$ quand $`0 \leqslant x \leqslant 1`$, $`0`$ quand $`x < 0`$ et $`1`$ quand $`x > 1`$.
+
+## Projecteurs
+Un bon exemple de projecteur est une lampe torche. Un projecteur a une position $`Q`$, est dirigé dans une direction $`d`$ et rayonne la lumière dans un cône avec un angle $`\phi_{max}`$. Le calcul du vecteur lumière $`L`$ est le même que pour un point lumineux : $`L = \frac{Q - P}{\|Q - P\|}`$ avec $`P`$ la position du point qui est éclairé. On peut observer qu'un point est dans le cône du projecteur si et seulement si l'angle entre le vecteur $`-L`$ et la direction du projecteur $`d`$ est plus petit que l'angle $`\phi_{max}`$. 
+
+Il faut savoir que la lumière d'un projecteur ne donne pas des résultats égaux partout, la lumière au centre du cône est plus intense que la lumière près du bord du cône. On peut utiliser une fonction qui permet de calculer cette intensité : $`k_{spot}(\phi) = \text{max}(cos(\phi), 0)^s = \text{max}(-L \cdot d, 0)^s`$. L'intensité diminue donc progressivement à mesure que $`\phi`$ augmente ; mais aussi en modifiant l'exposant $`s`$, on peut contrôler indirectemet $`\phi_{max}`$. Par exemple, si on prend $`s = 8`$, le cône a approximativement un demi-angle de $`45^{\circ}`$.
+
+## Implémentation de l'éclairage
+### Structure de la lumière
+Voici un exemple de structure pour une lumière, elle peut représenter une lumière parallèle, un point lumineux ou un projecteur. Cependant, en fonction du type de lumière, certaines variables ne seront pas utilisées.
+```c++
+struct Light
+{
+    DirectX::XMFLOAT3 Strength;  // Couleur de la lumière
+    float FalloffStart;          // Uniquement point lumineux et projecteurs
+    DirectX::XMFLOAT3 Direction; // Uniquement directionnelle et projecteurs
+    float FalloffEnd;            // Uniquement point lumineux et projecteurs
+    DirectX::XMFLOAT3 Position;  // Uniquement point lumineux et projecteurs
+    float SpotPower;             // Uniquement projecteurs
+};
+```
+On peut aussi définir la structure qu'on utilisera dans le *hlsl* : 
+```hlsl
+struct Light
+{
+    float3 Strength;
+    float FalloffStart;
+    float3 Direction;
+    float FalloffEnd;
+    float3 Position;
+    float SpotPower;
+};
+```
+L'ordre dans lequel on définit les membres de la structure n'est pas arbitraire, il est fait pour minimiser le *padding* (remplissage) dans la mémoire GPU. La structure ci-dessus sera packée en 3 vecteurs à 4 dimensions : 
+- vecteur 1 : (Strength.x, Strength.y, Strength.z, FalloffStart)
+- vecteur 2 : (Direction.x, Direction.y, Direction.z, FalloffEnd)
+- vecteur 3 : (Position.x, Position.y, Position.z, SpotPower)
+
+### Fonctions utiles d'éclairage
+On peut définir des fonctions qui nous seront bien utiles dans le shader : 
+```hlsl
+// Implémentation d'un facteur d'atténuation linéaire, s'applique pour les points lumineux et les projecteurs.
+float CalcAttenuation(float d, float falloffStart, float falloffEnd)
+{
+    return saturate((falloffEnd - d) / (falloffEnd - falloffStart));
+}
+
+// L'approximation de Schlick pour les équations de Fresnel, cela permet d'approximer le pourcent de lumière réfléchie d'une surface avec une normale n avec un angle entre le vecteur lumière L et la normale n.
+float3 SchlickFresnel(float3 R0, float3 normal, float3 lightVec)
+{
+    float cosIncidentAngle = saturate(dot(normal, lightVec));
+    float f0 = 1.0f - cosIncidentAngle;
+    float3 reflectPercent = R0 + (1.0f - R0) * (f0*f0*f0*f0*f0);
+    return reflectPercent;
+}
+
+struct Material
+{
+    float4 DiffuseAlbedo;
+    float3 FresnelR0;
+    // La brilliance est l'inverse de la rugosité : Shininess = 1 - roughness.
+    float Shininess;
+};
+
+// Calcul de la quantité de lumière réfléchie dans l'oeil, c'est le somme de la réflectance diffuse et de la réflectance spéculaire.
+float3 BlinnPhong(float3 lightStrength, float3 lightVec, float3 normal, float3 toEye, Material mat)
+{
+    const float m = mat.Shininess * 256.0f;
+    float3 halfVec = normalize(toEye + lightVec);
+    float roughnessFactor = (m + 8.0f) * pow(max(dot(halfVec, normal), 0.0f), m) / 8.0f;
+    float3 fresnelFactor = SchlickFresnel(mat.FresnelR0, halfVec, lightVec);
+    // L'équation spéculaire va en dehors de l'interval [0,1], mais on fait du rendu LDR. Donc on la scale un peu.
+    specAlbedo = specAlbedo / (specAlbedo + 1.0f);
+    return (mat.DiffuseAlbedo.rgb + specAlbedo) * lightStrength;
+}
+```
+### Implémentation des lumières directionnelles
+Soit la position de l'oeil $`E`$ et un point $`p`$ sur une surface visible pour l'oeil avec une normale $`n`$ et ses propriétés de matériau. La fonction suivante permet de calculer la quantité de lumière, depuis une source de lumière directionnelle, qui sera réfléchie dans la direction de l'oeil $`v = \text{normalize}(E - p)`$ : 
+```hlsl
+float3 ComputeDirectionalLight(Light L, Material mat, float3 normal, float3 toEye)
+{
+    // Le vecteur lumière pointe vers la source de lumière.
+    float3 lightVec = -L.Direction;
+    // Scale la lumière par la loi des cosinus de Lambert.
+    float ndotl = max(dot(lightVec, normal), 0.0f);
+    float3 lightStrength = L.Strength * ndotl;
+    return BlinnPhong(lightStrength, lightVec, normal, toEye, mat);
+}
+```
+### Implémentation des points lumineux
+```hlsl
+float3 ComputePointLight(Light L, Material mat, float3 pos, float3 normal, float3 toEye)
+{
+    // Le vecteur depuis la surface vers la lumière.
+    float3 lightVec = L.Position - pos;
+    // La distance entre la surface et la lumière.
+    float d = length(lightVec);
+    // Test de portée.
+    if(d > L.FalloffEnd)
+        return 0.0f;
+    // Normaliser le vecteur de lumière.
+    lightVec /= d;
+    // Scale la lumière par la loi des cosinus de Lambert.
+    float ndotl = max(dot(lightVec, normal), 0.0f);
+    float3 lightStrength = L.Strength * ndotl;
+    // Atténuer la lumière par la distance.
+    float att = CalcAttenuation(d, L.FalloffStart, L.FalloffEnd);
+    lightStrength *= att;
+    return BlinnPhong(lightStrength, lightVec, normal, toEye, mat);
+}
+```
+### Implémentation des projecteurs
+```hlsl
+float3 ComputeSpotLight(Light L, Material mat, float3 pos, float3 normal, float3 toEye)
+{
+    // Le vecteur depuis la surface vers la lumière.
+    float3 lightVec = L.Position - pos;
+    // La distance entre la surface et la lumière.
+    float d = length(lightVec);
+    // Test de portée.
+    if(d > L.FalloffEnd)
+        return 0.0f;
+    // Normaliser le vecteur de lumière.
+    lightVec /= d;
+    // Scale la lumière par la loi des cosinus de Lambert.
+    float ndotl = max(dot(lightVec, normal), 0.0f);
+    float3 lightStrength = L.Strength * ndotl;
+    // Atténuer la lumière par la distance.
+    float att = CalcAttenuation(d, L.FalloffStart, L.FalloffEnd);
+    lightStrength *= att;
+    // Scale par le projecteur
+    float spotFactor = pow(max(dot(-lightVec, L.Direction), 0.0f), L.SpotPower);
+    lightStrength *= spotFactor;
+    return BlinnPhong(lightStrength, lightVec, normal, toEye, mat);
+}
+```
+### Accumulation de plusieurs lumières
+L'éclairage est additif, donc on peut avoir plusieurs lumières dans une scene, on a juste besoin d'itérer sur chaque source de lumière et sommer leur contribution. Ici on part du principe qu'on a un maximum de 16 lumières et on utilise la convention que les lumières directionnelles sont en premier dans le tableau, puis les points lumineux et enfin les projecteurs.
+```hlsl
+#define MaxLights 16
+
+// Les données constantes qui varient par matériau.
+cbuffer cbPass : register(b2)
+{
+    // ...
+    // Indices [0, NUM_DIR_LIGHTS[ sont des lumières directionnelles.
+    // Indices [NUM_DIR_LIGHTS, NUM_DIR_LIGHTS + NUM_POINT_LIGHTS[ sont des points lumineux. 
+    // indices [NUM_DIR_LIGHTS + NUM_POINT_LIGHTS, NUM_DIR_LIGHTS + NUM_POINT_LIGHT + NUM_SPOT_LIGHTS[ sont des projecteurs.
+    Light gLights[MaxLights];
+};
+
+float4 ComputeLighting(Light gLights[MaxLights], Material mat, float3 pos, float3 normal, float3 toEye, float3 shadowFactor)
+{
+    float3 result = 0.0f;
+    int i = 0;
+#if (NUM_DIR_LIGHTS > 0)
+    for(i = 0; i < NUM_DIR_LIGHTS; i++)
+        result += shadowFactor[i] * ComputeDirectionalLight(gLights[i], mat, normal, toEye);
+#endif
+#if (NUM_POINT_LIGHTS > 0)
+    for(i = NUM_DIR_LIGHTS; i < NUM_DIR_LIGHTS + NUM_POINT_LIGHTS; i++)
+        result += ComputePointLight(gLights[i], mat, pos, normal, toEye);
+#endif
+#if (NUM_SPOT_LIGHTS > 0)
+    for(i = NUM_DIR_LIGHTS + NUM_POINT_LIGHTS; i < NUM_DIR_LIGHTS + NUM_POINT_LIGHTS + NUM_SPOT_LIGHTS; i++)
+        result += ComputeSpotLight(gLights[i], mat, pos, normal, toEye);
+#endif
+    return float4(result, 0.0f);
+}
+```
+### Fichier HLSL principal
+Voici le code qui contient le vertex et le pixel shader qu'on pourra utiliser : 
+```hlsl
+// Définition par défaut des nombres de lumières.
+#ifndef NUM_DIR_LIGHTS
+    #define NUM_DIR_LIGHTS 1
+#endif
+
+#ifndef NUM_POINT_LIGHTS
+    #define NUM_POINT_LIGHTS 0
+#endif
+
+#ifndef NUM_SPOT_LIGHTS
+    #define NUM_SPOT_LIGHTS 0
+#endif
+
+
+#include “LightingUtil.hlsl”
+
+// Données constantes qui varient par frame.
+cbuffer cbPerObject : register(b0)
+{
+    float4x4 gWorld;
+};
+
+// Données constantes qui varient par matériau.
+cbuffer cbMaterial : register(b1)
+{
+    float4 gDiffuseAlbedo;
+    float3 gFresnelR0;
+    float gRoughness;
+    float4x4 gMatTransform;
+};
+
+// Données constantes qui varient par passe.
+cbuffer cbPass : register(b2)
+{
+    float4x4 gView;
+    float4x4 gInvView;
+    float4x4 gProj;
+    float4x4 gInvProj;
+    float4x4 gViewProj;
+    float4x4 gInvViewProj;
+    float3 gEyePosW;
+    float cbPerObjectPad1;
+    float2 gRenderTargetSize;
+    float2 gInvRenderTargetSize;
+    float gNearZ;
+    float gFarZ;
+    float gTotalTime;
+    float gDeltaTime;
+    float4 gAmbientLight;
+    Light gLights[MaxLights];
+};
+
+struct VertexIn
+{
+    float3 PosL : POSITION;
+    float3 NormalL : NORMAL;
+};
+
+struct VertexOut
+{
+    float4 PosH : SV_POSITION;
+    float3 PosW : POSITION;
+    float3 NormalW : NORMAL;
+};
+
+VertexOut VS(VertexIn vin)
+{
+    VertexOut vout = (VertexOut)0.0f;
+    // Transformation en espace monde.
+    float4 posW = mul(float4(vin.PosL, 1.0f), gWorld);
+    vout.PosW = posW.xyz;
+    // On assume un scaling non uniform, on doit donc utiliser la matrice inverse-transpose du monde.
+    vout.NormalW = mul(vin.NormalL, (float3x3)gWorld);
+    // Transformation en espace homogeneous clip.
+    vout.PosH = mul(posW, gViewProj);
+    return vout;
+}
+
+float4 PS(VertexOut pin) : SV_Target
+{
+    // L'interpolation des normales peut les dénormaliser, on doit donc les renormaliser.
+    pin.NormalW = normalize(pin.NormalW);
+    // Vecteur du point éclairé vers l'oeil.
+    float3 toEyeW = normalize(gEyePosW - pin.PosW);
+    // Éclairage indirect.
+    float4 ambient = gAmbientLight*gDiffuseAlbedo;
+    // Éclairage direct.
+    const float shininess = 1.0f - gRoughness;
+    Material mat = { gDiffuseAlbedo, gFresnelR0, shininess };
+    float3 shadowFactor = 1.0f;
+    float4 directLight = ComputeLighting(gLights, mat, pin.PosW, pin.NormalW, toEyeW, shadowFactor);
+    float4 litColor = ambient + directLight;
+    // Convention courante de prendre l'alpha depuis le matériau diffus.
+    litColor.a = gDiffuseAlbedo.a;
+    return litColor;
+}
+```
