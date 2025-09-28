@@ -14,6 +14,8 @@ Sommaire :
 - [Éclairage spéculaire](#éclairage-spéculaire)
     - [Effet de Fresnel](#effet-de-fresnel)
     - [La rugosité](#la-rugosité)
+- [Récapitulatif](#récapitulatif)
+- [Matériaux](#matériaux)
 
 ## Interaction entre la lumière et les matériaux
 Quand on utilise de l'éclairage, on ne précise plus la couleur de chaque sommet directement mais on précise des matériaux et des lumières puis on applique une formule pour calculer la couleur finale de chaque pixel en fonction de la lumière et du matériau. Les matériaux peuvent être vu comme des propriétés qui définissent comment la lumière intéragit avec la surface d'un objet. Par exemple, la couleur de la lumière que la surface réfléchit et absorbe, l'indice de refraction du matériau sous la surface, combien la surface est lisse ou combien la surface est transparente.
@@ -148,3 +150,145 @@ On peut combiner $`\rho(\theta_h)`$ avec un facteur de normalisation pour obteni
 
 On peut combiner la réflexion de Fresnel avec la rugosité de la surface. On essaye de calculer la quantité de lumière qui est réfléchie dans la direction de vue $`v`$. Soit $`\alpha_h`$ l'angle entre le vecteur lumière et le halfway vecteur $`h`$, alors $`R_F(\alpha_h)`$ nous donne la quantité de lumière réfléchie entre $`h`$ et $`v`$. En multipliant la quantité de lumière réfléchie $`R_F(\alpha_h)`$ due à l'effet de Fresnel par la quantité de lumière réfléchie due à la rugosité $`S(\theta_h)`$, on obtient la quantité de lumière réfléchie spéculaire. Soit $`(\text{max}(L \cdot n, 0) \cdot B_L)`$ qui représente la quantité de lumière incidente qui frappe la surface en un point. Alors la fraction de $`(\text{max}(L \cdot n, 0) \cdot B_L)`$ réfléchie de manière spéculaire dans l'oeil en raison de la rugosité et de l'effet de Fresnel est donnée par : \
 $`c_s = \text{max}(L \cdot n, 0) \cdot B_L \otimes R_F(\alpha_h) \frac{m + 8}{8}(n \cdot h)^{m}`$
+
+## Récapitulatif
+La lumière totale réfléchie par une surface est la somme de la réflectance de la lumière ambiante, de la réflectance de la lumière diffuse et de la réflectance de la lumière spéculaire : 
+1) Lumière ambiante $`c_a`$ : modélise la quantité de lumière réfléchie par la surface en raison de la lumière indirecte.
+2) Lumière diffuse $`c_d`$ : modélise la lumière qui entre dans le milieu, se diffuse sous la surface où une partie est absorbée et le reste est diffusé à nouveau hors de la surface. Comme il est difficile de modéliser cette diffusion sous la surface, on suppose que la lumière est réémise de manière égale dans toutes les directions au dessus de la surface autour du point d'incidence.
+3) Lumière spéculaire $`c_s`$ : modélise la lumière qui est réfléchie par la surface en raison de l'effet de Fresnel et de la rugosité de la surface.
+
+Ce qui nous amène à l'équation finale de l'éclairage : \
+$`c = c_a + c_d + c_s`$ \
+$`c = A_L \otimes m_d + \text{max}\left(L \cdot n, 0\right) \cdot B_L \otimes \left( m_d + R_F(\alpha_h) \frac{m + 8}{8}(n \cdot h)^{m} \right)`$ \
+Tous les vecteurs de cette équation doivent être unitaires.
+1. $`L`$ est le vecteur lumière qui pointe vers la source de lumière.
+2. $`n`$ est la normale de surface.
+3. $`h`$ est le halfway vecteur entre le vecteur lumière et le vecteur de vue.
+4. $`A_L`$ représente la quantité de lumière ambiante incidente.
+5. $`B_L`$ représente la quantité de lumière directe incidente.
+6. $`m_d`$ spécifie la quantité de lumière incidente que la surface réfléchit en raison de la réflectance diffuse.
+7. $`L \cdot n`$ est la loi des cosinus de Lambert.
+8. $`\alpha_h`$ est l'angle entre le halfway vecteur et le vecteur lumière.
+9. $`R_F(\alpha_h)`$ est la quantité de lumière réfléchie vers l'oeil en raison de l'effet de Fresnel.
+10. $`m`$ contrôle la rugosité de la surface.
+11. $`(n \cdot h)`$ spécifie la fraction de micro-facettes avec des normales $`h`$ qui forment un angle $`\theta_h`$ avec la macro-normale $`n`$.
+12. $`(m + 8) / 8`$ est un facteur de normalisation pour modéliser la conservation d'énergie dans la réflection spéculaire.
+
+## Matériaux
+Voici un exemple de structure pour un matériau : 
+```c++
+struct Material
+{
+    // Nom unique du matériau pour la recherche.
+    std::string Name;
+    
+    // Indice dans le buffer constant correspondant à ce matériau.
+    int MatCBIndex = -1;
+    
+    // Index dans le tas SRV pour la texture diffuse.
+    int DiffuseSrvHeapIndex = -1;
+
+    // Flag indiquant si le matériau a changé et qu'on doit mettre à jour le buffer constant. 
+    // Parce qu'on a un buffer constant de matériau pour chaque FrameResource, on doit appliquer la mise à jour à chaque FrameResource.
+    // Donc, quand on modifie un matériau, on doit définir NumFramesDirty = gNumFrameResources pour que chaque FrameResource reçoive la mise à jour.
+    int NumFramesDirty = gNumFrameResources;
+
+    // Données du buffer constant de matériau utilisées pour le shading.
+    DirectX::XMFLOAT4 DiffuseAlbedo = { 1.0f, 1.0f, 1.0f, 1.0f };
+    DirectX::XMFLOAT3 FresnelR0 = { 0.01f, 0.01f, 0.01f };
+    float Roughness = 0.25f;
+    DirectX::XMFLOAT4X4 MatTransform = MathUtils::Identity4x4();
+};
+```
+Pour modéliser des matériaux réalistes, on a besoin de définir des valeurs réalistes pour les propriétés du matériau (`DiffuseAlbedo` et `FresnelR0`). Pour compenser le fait qu'on ne fasse pas une simulation d'éclairage à 100%, on donne une valeur plutôt faible pour la variable `DiffuseAlbedo` plutôt que 0. Pour ce qui est de la rugosité, dans notre structure elle est définie entre 0.0 et 1.0. Une rugosité de 0 signifie que la surface est parfaitement lisse et une rugosité de 1 signifie que la surface est extrêmement rugueuse. On peut donc déduire la brillance (*shininess*) du matériau en utilisant la rugosité : $`\text{shininess} = 1.0 - \text{roughness} \in [0, 1]`$.
+
+La question qui se pose maintenant est de savoir à quel niveau de granularité on doit spécifier les valeurs des matériaux. Les valeurs de matériau peuvent varier selon la surface, c'est-à-dire que différents points d'une surface peuvent avoir des valeurs de matériau différentes. Pour gérer cela, une solution possible est de spécifier les valeurs de matériau par sommet puis d'interpoler les valeurs durant la rasterisation. Cependant, ce n'est pas une bonne méthode pour modéliser de manière réaliste les détails fins.Une meilleure approche est d'utiliser le mappage de texture (*texture mapping*) que l'on verra plus tard. Pour le moment, on autorise les modifications des matériaux à la fréquence d'appel de dessin.
+```c++
+std::unordered_map<std::string, std::unique_ptr<Material>> mMaterials;
+
+void BuildMaterials()
+{
+    std::unique_ptr<Material> grass = std::make_unique<Material>();
+    grass->Name = “grass”;
+    grass->MatCBIndex = 0;
+    grass->DiffuseAlbedo = XMFLOAT4(0.2f, 0.6f, 0.6f, 1.0f);
+    grass->FresnelR0 = XMFLOAT3(0.01f, 0.01f, 0.01f);
+    grass->Roughness = 0.125f;
+
+    // Ce n'est pas une bonne définition de matériau pour l'eau, mais pour le moment on a pas encore tous les outils de rendu dont on a besoin (transparence, environnement, réflexion), donc on le simule pour l'instant.
+    std::unique_ptr<Material> water = std::make_unique<Material>();
+    water->Name = “water”;
+    water->MatCBIndex = 1;
+    water->DiffuseAlbedo = XMFLOAT4(0.0f, 0.2f, 0.6f, 1.0f);
+    water->FresnelR0 = XMFLOAT3(0.1f, 0.1f, 0.1f);
+    water->Roughness = 0.0f;
+    mMaterials[“grass”] = std::move(grass);
+    mMaterials[“water”] = std::move(water);
+}
+```
+La map `mMaterials` permet de stocker les données des matériaux dans la mémoire CPU mais pour que le GPU accède aux données des matériaux dans les shaders, on doit reproduire les données dans un buffer constant. On a donc juste besoin d'ajouter un buffer constant de matériau pour chaque FrameResource.
+```c++
+struct MaterialConstants
+{
+    DirectX::XMFLOAT4 DiffuseAlbedo = { 1.0f, 1.0f, 1.0f, 1.0f };
+    DirectX::XMFLOAT3 FresnelR0 = { 0.01f, 0.01f, 0.01f };
+    float Roughness = 0.25f;
+    DirectX::XMFLOAT4X4 MatTransform = MathHelper::Identity4x4();
+};
+
+struct FrameResource
+{ 
+public:
+    // ...
+    std::unique_ptr<UploadBuffer<MaterialConstants>> MaterialCB = nullptr;
+    // ...
+};
+```
+Dans la fonction `Update`, les données des matériaux sont copiées dans une sous-région du buffer constant chaque fois qu'ils sont modifiés (*dirty*).
+```c++
+void UpdateMaterialCBs()
+{
+    UploadBuffer<MaterialConstants>* currentMaterialCB = mCurrentFrameResource->MaterialCB.get();
+    for(const std::unique_ptr<Material>& e : mMaterials)
+    {
+        // On met à jour les données du buffer constant seulement si les constantes ont changé. 
+        // Si les données du buffer constant changent, elles doivent être mises à jour pour chaque FrameResource.
+        Material* mat = e.second.get();
+        if(mat->NumFramesDirty > 0)
+        {
+            XMMATRIX matTransform = XMLoadFloat4x4(&mat->MatTransform);
+            MaterialConstants matConstants;
+            matConstants.DiffuseAlbedo = mat->DiffuseAlbedo;
+            matConstants.FresnelR0 = mat->FresnelR0;
+            matConstants.Roughness = mat->Roughness;
+            currentMaterialCB->CopyData(mat->MatCBIndex, matConstants);
+
+            // La prochaine FrameResource doit être mise à jour aussi.
+            mat->NumFramesDirty--;
+        }
+    }
+}
+```
+Maintenant, chaque *RenderItem* contient un pointeur vers le matériau qu'il utilise. Chaque matériau a un indice qui spécifie où se trouvent ses données constants dans le buffer constant de matériau. À partir de ça, on peut offsetter vers l'adresse virtuelle des données constantes nécessaires pour le RenderItem qu'on veut dessiner. Voici un exemple de code qui permet de dessiner des RenderItems avec différents matériaux : 
+```c++
+void DrawRenderItems(ID3D12GraphicsCommandList* cmdList, const std::vector<RenderItem*>& ritems)
+{
+    UINT objCBByteSize = d3dUtil::CalcConstantBufferByteSize(sizeof(ObjectConstants));
+    UINT matCBByteSize = d3dUtil::CalcConstantBufferByteSize(sizeof(MaterialConstants));
+    ID3D12Resource* objectCB = mCurrFrameResource->ObjectCB->Resource();
+    ID3D12Resource* matCB = mCurrFrameResource->MaterialCB->Resource();
+    for(size_t i = 0; i < ritems.size(); i++)
+    {
+        RenderItem* ri = ritems[i];
+        cmdList->IASetVertexBuffers(0, 1, &ri->Geo->VertexBufferView());
+        cmdList->IASetIndexBuffer(&ri->Geo->IndexBufferView());
+        cmdList->IASetPrimitiveTopology(ri->PrimitiveType);
+        D3D12_GPU_VIRTUAL_ADDRESS objCBAddress = objectCB->GetGPUVirtualAddress() + ri->ObjCBIndex*objCBByteSize;
+        D3D12_GPU_VIRTUAL_ADDRESS matCBAddress = matCB->GetGPUVirtualAddress() + ri->Mat->MatCBIndex*matCBByteSize;
+        cmdList->SetGraphicsRootConstantBufferView(0, objCBAddress);
+        cmdList->SetGraphicsRootConstantBufferView(1, matCBAddress);
+        cmdList->DrawIndexedInstanced(ri->IndexCount, 1, ri->StartIndexLocation, ri->BaseVertexLocation, 0);
+    }
+}
+```
+On rappelle qu'on a besoin des vecteurs normaux à chaque point de la surface d'un maillage triangulé ce qui nous permet de déterminer l'angle auquel la lumière frappe la surface. Pour obtenir une approximation des normales de surface en chaque point, on spécifie les normales sur chaque sommet. Ces normales seront alors interpolées à travers le triangle pendant la rasterisation.
