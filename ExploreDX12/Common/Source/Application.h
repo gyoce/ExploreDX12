@@ -1,6 +1,5 @@
 #pragma once
 
-#include "Graphics/D3DUtils.h"
 #include "Graphics/DirectX12.h"
 #include "Managers/WindowManager.h"
 #include "Managers/TimeManager.h"

@@ -12,7 +12,7 @@ struct Vertex
 
 struct ObjectConstants
 {
-    XMFLOAT4X4 WorldViewProj = MathUtils::Identity4x4();
+    XMFLOAT4X4 WorldViewProj = DirectXMathUtils::Identity4x4();
 };
 
 class BoxApp : public Application
@@ -48,9 +48,9 @@ private:
     std::unique_ptr<MeshGeometry> mBoxGeo = nullptr;
     Microsoft::WRL::ComPtr<ID3D12PipelineState> mPSO = nullptr;
 
-    XMFLOAT4X4 mWorld = MathUtils::Identity4x4();
-    XMFLOAT4X4 mView = MathUtils::Identity4x4();
-    XMFLOAT4X4 mProj = MathUtils::Identity4x4();
+    XMFLOAT4X4 mWorld = DirectXMathUtils::Identity4x4();
+    XMFLOAT4X4 mView = DirectXMathUtils::Identity4x4();
+    XMFLOAT4X4 mProj = DirectXMathUtils::Identity4x4();
 
     float mTheta = 1.5f * XM_PI;
     float mPhi = XM_PIDIV4;

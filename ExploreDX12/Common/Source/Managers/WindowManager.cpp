@@ -3,6 +3,8 @@
 #include "Application.h"
 #include "Utils/Logs.h"
 
+#include <windowsx.h>
+
 static LRESULT WindowManagerProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
     return WindowManager::HandleEvent(hwnd, msg, wParam, lParam);

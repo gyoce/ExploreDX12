@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Graphics/D3DUtils.h"
+#include "Graphics/DirectXUtils.h"
 
 template<typename T>
 class UploadBuffer
@@ -12,7 +12,7 @@ public:
         mElementByteSize = sizeof(T);
 
         if (isConstantBuffer)
-            mElementByteSize = D3DUtils::CalcConstantBufferByteSize(sizeof(T));
+            mElementByteSize = DirectXUtils::CalcConstantBufferByteSize(sizeof(T));
 
         CD3DX12_HEAP_PROPERTIES heapProperties(D3D12_HEAP_TYPE_UPLOAD);
         CD3DX12_RESOURCE_DESC resourceDesc = CD3DX12_RESOURCE_DESC::Buffer(mElementByteSize * elementCount);
@@ -30,7 +30,7 @@ public:
         mMappedData = nullptr;
     }
 
-    ID3D12Resource* Resource()const
+    ID3D12Resource* Resource() const
     {
         return mUploadBuffer.Get();
     }

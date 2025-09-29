@@ -1,9 +1,12 @@
 #pragma once
 
-#include "Graphics/D3DUtils.h"
+#include "Graphics/DirectXMathUtils.h"
+#include <vector>
 
 namespace GeometryGenerator
 {
+    using namespace DirectX;
+
     struct Vertex
     {
         Vertex() = default;

@@ -1,33 +1,12 @@
 #pragma once
 
-// Exclude rarely-used stuff from Windows headers.
-#ifndef WIN32_LEAN_AND_MEAN
-#define WIN32_LEAN_AND_MEAN 
-#endif
-
-#include <windows.h>
-#include <windowsx.h>
 #include <wrl.h>
 #include <d3dx12/d3dx12.h>
-#include <DirectXMath.h>
-#include <DirectXColors.h>
-#include <DirectXCollision.h>
-#include <dxgi1_4.h>
-#include <string>
-#include <comdef.h>
-#include <dxgidebug.h>
 #include <d3dcompiler.h>
-
-using namespace DirectX;
+#include <comdef.h>
 
 #include "Utils/Logs.h"
-
-inline std::wstring AnsiToWString(const std::string& str)
-{
-    WCHAR buffer[512];
-    MultiByteToWideChar(CP_ACP, 0, str.c_str(), -1, buffer, 512);
-    return std::wstring(buffer);
-}
+#include "Graphics/DirectXMathUtils.h"
 
 class DxException
 {
@@ -51,6 +30,13 @@ public:
     int LineNumber = -1;
 };
 
+inline std::wstring AnsiToWString(const std::string& str)
+{
+    WCHAR buffer[512];
+    MultiByteToWideChar(CP_ACP, 0, str.c_str(), -1, buffer, 512);
+    return std::wstring(buffer);
+}
+
 #ifndef ThrowIfFailed
 #define ThrowIfFailed(x)                                   \
 {                                                          \
@@ -65,7 +51,7 @@ public:
 }
 #endif
 
-namespace D3DUtils
+namespace DirectXUtils
 {
     inline UINT CalcConstantBufferByteSize(UINT byteSize)
     {
@@ -75,26 +61,4 @@ namespace D3DUtils
     Microsoft::WRL::ComPtr<ID3DBlob> CompileShader(const std::wstring& filename, const D3D_SHADER_MACRO* defines, const std::string& entrypoint, const std::string& target);
 
     Microsoft::WRL::ComPtr<ID3D12Resource> CreateDefaultBuffer(ID3D12Device* device, ID3D12GraphicsCommandList* cmdList, const void* initData, UINT64 byteSize, Microsoft::WRL::ComPtr<ID3D12Resource>& uploadBuffer);
-}
-
-namespace MathUtils
-{
-    inline const float Pi = 3.1415926535f;
-
-    inline XMFLOAT4X4 Identity4x4()
-    {
-        static XMFLOAT4X4 I {
-            1.0f, 0.0f, 0.0f, 0.0f,
-            0.0f, 1.0f, 0.0f, 0.0f,
-            0.0f, 0.0f, 1.0f, 0.0f,
-            0.0f, 0.0f, 0.0f, 1.0f,
-        };
-        return I;
-    }
-
-    template<typename T>
-    inline T Clamp(const T& x, const T& low, const T& high)
-    {
-        return x < low ? low : (x > high ? high : x);
-    }
 }

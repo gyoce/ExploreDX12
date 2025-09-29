@@ -18,7 +18,7 @@ void ShapesApp::OnWindowResize()
 	Application::OnWindowResize();
 
 	// Quand la fenêtre est resize, on doit mettre à jour l'aspect ratio et recalculer la matrice de projection.
-	XMMATRIX P = XMMatrixPerspectiveFovLH(0.25f * MathUtils::Pi, WindowManager::AspectRatio(), 1.0f, 1000.0f);
+	XMMATRIX P = XMMatrixPerspectiveFovLH(0.25f * DirectXMathUtils::Pi, WindowManager::AspectRatio(), 1.0f, 1000.0f);
 	XMStoreFloat4x4(&mProj, P);
 }
 
@@ -41,20 +41,16 @@ void ShapesApp::OnMouseMove(WPARAM btnState, int x, int y)
 	{
 		float dx = XMConvertToRadians(0.25f * static_cast<float>(x - mLastMousePos.x));
 		float dy = XMConvertToRadians(0.25f * static_cast<float>(y - mLastMousePos.y));
-
 		mTheta += dx;
 		mPhi += dy;
-
-		mPhi = MathUtils::Clamp(mPhi, 0.1f, MathUtils::Pi - 0.1f);
+		mPhi = DirectXMathUtils::Clamp(mPhi, 0.1f, DirectXMathUtils::Pi - 0.1f);
 	} 
 	else if ((btnState & MK_RBUTTON) != 0)
 	{
 		float dx = 0.05f * static_cast<float>(x - mLastMousePos.x);
 		float dy = 0.05f * static_cast<float>(y - mLastMousePos.y);
-
 		mRadius += dx - dy;
-
-		mRadius = MathUtils::Clamp(mRadius, 5.0f, 150.0f);
+		mRadius = DirectXMathUtils::Clamp(mRadius, 5.0f, 150.0f);
 	}
 
 	mLastMousePos.x = x;
@@ -74,7 +70,7 @@ void ShapesApp::Update()
 	UpdateCamera();
 
 	// On boucle circulairement sur les frame resources.
-	mCurrentFrameResourceIndex = (mCurrentFrameResourceIndex + 1) % gNumberOfFrameResources;
+	mCurrentFrameResourceIndex = (mCurrentFrameResourceIndex + 1) % DirectX12::NumberOfFrameResources;
 	mCurrentFrameResource = mFrameResources[mCurrentFrameResourceIndex].get();
 
 	// Est-ce que le GPU a fini de traiter les commandes de la frame resource courante ? Si ce n'est pas le cas, on attend que le GPU ait fini de traiter les commandes jusqu'à cette barrière.
@@ -94,7 +90,7 @@ void ShapesApp::Draw()
 {
 	Application::Draw();
 
-	Microsoft::WRL::ComPtr<ID3D12CommandAllocator> cmdListAlloc = mCurrentFrameResource->CmdListAlloc;
+	Microsoft::WRL::ComPtr<ID3D12CommandAllocator> cmdListAlloc = mCurrentFrameResource->CommandListAllocator;
 	ThrowIfFailed(cmdListAlloc->Reset());
 
 	if (mIsWireframe)
@@ -114,10 +110,8 @@ void ShapesApp::Draw()
 
 	D3D12_CPU_DESCRIPTOR_HANDLE cbbv = DirectX12::CurrentBackBufferView();
 	D3D12_CPU_DESCRIPTOR_HANDLE dsv = DirectX12::DepthStencilView();
-
 	DirectX12::CommandList->ClearRenderTargetView(cbbv, Colors::LightSteelBlue, 0, nullptr);
 	DirectX12::CommandList->ClearDepthStencilView(dsv, D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 1.0f, 0, 0, nullptr);
-
 	DirectX12::CommandList->OMSetRenderTargets(1, &cbbv, true, &dsv);
 
 	ID3D12DescriptorHeap* descriptorHeaps[] = { mCbvHeap.Get() };
@@ -222,7 +216,7 @@ void ShapesApp::UpdateMainPassCB()
 
 void ShapesApp::DrawRenderItems(ID3D12GraphicsCommandList* cmdList, const std::vector<RenderItem*>& ritems)
 {
-	UINT objCBByteSize = D3DUtils::CalcConstantBufferByteSize(sizeof(ObjectConstants));
+	UINT objCBByteSize = DirectXUtils::CalcConstantBufferByteSize(sizeof(ObjectConstants));
 
 	ID3D12Resource* objectCB = mCurrentFrameResource->ObjectCB->Resource();
 
@@ -290,8 +284,8 @@ void ShapesApp::BuildRootSignature()
 
 void ShapesApp::BuildShadersAndInputLayout()
 {
-    mShaders["standardVS"] = D3DUtils::CompileShader(L"Shaders\\color.hlsl", nullptr, "VS", "vs_5_1");
-    mShaders["opaquePS"] = D3DUtils::CompileShader(L"Shaders\\color.hlsl", nullptr, "PS", "ps_5_1");
+    mShaders["standardVS"] = DirectXUtils::CompileShader(L"Shaders\\color.hlsl", nullptr, "VS", "vs_5_1");
+    mShaders["opaquePS"] = DirectXUtils::CompileShader(L"Shaders\\color.hlsl", nullptr, "PS", "ps_5_1");
 
     mInputLayout =
     {
@@ -389,8 +383,8 @@ void ShapesApp::BuildShapeGeometry()
 	ThrowIfFailed(D3DCreateBlob(ibByteSize, &geo->IndexBufferCPU));
 	CopyMemory(geo->IndexBufferCPU->GetBufferPointer(), indices.data(), ibByteSize);
 
-	geo->VertexBufferGPU = D3DUtils::CreateDefaultBuffer(DirectX12::D3DDevice.Get(), DirectX12::CommandList.Get(), vertices.data(), vbByteSize, geo->VertexBufferUploader);
-	geo->IndexBufferGPU = D3DUtils::CreateDefaultBuffer(DirectX12::D3DDevice.Get(), DirectX12::CommandList.Get(), indices.data(), ibByteSize, geo->IndexBufferUploader);
+	geo->VertexBufferGPU = DirectXUtils::CreateDefaultBuffer(DirectX12::D3DDevice.Get(), DirectX12::CommandList.Get(), vertices.data(), vbByteSize, geo->VertexBufferUploader);
+	geo->IndexBufferGPU = DirectXUtils::CreateDefaultBuffer(DirectX12::D3DDevice.Get(), DirectX12::CommandList.Get(), indices.data(), ibByteSize, geo->IndexBufferUploader);
 
 	geo->VertexByteStride = sizeof(Vertex);
 	geo->VertexBufferByteSize = vbByteSize;
@@ -418,7 +412,7 @@ void ShapesApp::BuildRenderItems()
 	mAllRitems.push_back(std::move(boxRitem));
 
 	std::unique_ptr<RenderItem> gridRitem = std::make_unique<RenderItem>();
-	gridRitem->World = MathUtils::Identity4x4();
+	gridRitem->World = DirectXMathUtils::Identity4x4();
 	gridRitem->ObjCBIndex = 1;
 	gridRitem->Geo = mGeometries["shapeGeo"].get();
 	gridRitem->PrimitiveType = D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
@@ -486,7 +480,7 @@ void ShapesApp::BuildRenderItems()
 
 void ShapesApp::BuildFrameResources()
 {
-	for (int i = 0; i < gNumberOfFrameResources; i++)
+	for (int i = 0; i < DirectX12::NumberOfFrameResources; i++)
 		mFrameResources.push_back(std::make_unique<FrameResource>(DirectX12::D3DDevice.Get(), 1, (UINT)mAllRitems.size()));
 }
 
@@ -495,10 +489,10 @@ void ShapesApp::BuildDescriptorHeaps()
 	UINT objCount = (UINT)mOpaqueRitems.size();
 
 	// On a besoin d'un descriptor CBV pour chaque objet par frame resource + 1 descriptor CBV pour la passe par frame resource.
-	UINT numDescriptors = (objCount + 1) * gNumberOfFrameResources;
+	UINT numDescriptors = (objCount + 1) * DirectX12::NumberOfFrameResources;
 
 	// On sauvegarde un offset pour le descriptor CBV de la passe (les 3 derniers).
-	mPassCbvOffset = objCount * gNumberOfFrameResources;
+	mPassCbvOffset = objCount * DirectX12::NumberOfFrameResources;
 
 	D3D12_DESCRIPTOR_HEAP_DESC cbvHeapDesc;
 	cbvHeapDesc.NumDescriptors = numDescriptors;
@@ -510,12 +504,12 @@ void ShapesApp::BuildDescriptorHeaps()
 
 void ShapesApp::BuildConstantBufferViews()
 {
-	UINT objCBByteSize = D3DUtils::CalcConstantBufferByteSize(sizeof(ObjectConstants));
+	UINT objCBByteSize = DirectXUtils::CalcConstantBufferByteSize(sizeof(ObjectConstants));
 
 	UINT objCount = (UINT)mOpaqueRitems.size();
 
 	// On a besoin d'un descripteur CBV pour chaque objet de chaque frame resource.
-	for (int frameIndex = 0; frameIndex < gNumberOfFrameResources; frameIndex++)
+	for (int frameIndex = 0; frameIndex < DirectX12::NumberOfFrameResources; frameIndex++)
 	{
 		// On accède à la ressource de l'upload buffer d'objet constants de la frame resource actuelle.
 		ID3D12Resource* objectCB = mFrameResources[frameIndex]->ObjectCB->Resource();
@@ -539,10 +533,10 @@ void ShapesApp::BuildConstantBufferViews()
 		}
 	}
 
-	UINT passCBByteSize = D3DUtils::CalcConstantBufferByteSize(sizeof(PassConstants));
+	UINT passCBByteSize = DirectXUtils::CalcConstantBufferByteSize(sizeof(PassConstants));
 
 	// Les trois derniers descripteurs sont des CBV de la "passe" pour chaque frame resource.
-	for (int frameIndex = 0; frameIndex < gNumberOfFrameResources; frameIndex++)
+	for (int frameIndex = 0; frameIndex < DirectX12::NumberOfFrameResources; frameIndex++)
 	{
 		ID3D12Resource* passCB = mFrameResources[frameIndex]->PassCB->Resource();
 		D3D12_GPU_VIRTUAL_ADDRESS cbAddress = passCB->GetGPUVirtualAddress();

@@ -24,13 +24,13 @@
     <ClCompile Include="Source\Managers\WindowManager.cpp">
       <Filter>Source\Managers</Filter>
     </ClCompile>
-    <ClCompile Include="Source\Graphics\D3DUtils.cpp">
-      <Filter>Source\Graphics</Filter>
-    </ClCompile>
     <ClCompile Include="Source\Graphics\DirectX12.cpp">
       <Filter>Source\Graphics</Filter>
     </ClCompile>
     <ClCompile Include="Source\Graphics\GeometryGenerator.cpp">
+      <Filter>Source\Graphics</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Graphics\DirectXUtils.cpp">
       <Filter>Source\Graphics</Filter>
     </ClCompile>
   </ItemGroup>
@@ -47,9 +47,6 @@
     <ClInclude Include="Source\Managers\WindowManager.h">
       <Filter>Source\Managers</Filter>
     </ClInclude>
-    <ClInclude Include="Source\Graphics\D3DUtils.h">
-      <Filter>Source\Graphics</Filter>
-    </ClInclude>
     <ClInclude Include="Source\Graphics\DirectX12.h">
       <Filter>Source\Graphics</Filter>
     </ClInclude>
@@ -64,6 +61,18 @@
     </ClInclude>
     <ClInclude Include="Source\CommonMain.h">
       <Filter>Source</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Graphics\DirectXUtils.h">
+      <Filter>Source\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Graphics\DirectXMathUtils.h">
+      <Filter>Source\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Graphics\Material.h">
+      <Filter>Source\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\Graphics\Light.h">
+      <Filter>Source\Graphics</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

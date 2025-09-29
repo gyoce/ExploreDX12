@@ -1,7 +1,9 @@
 #pragma once
 
-#include "Graphics/DirectXMathUtils.h"
+#include "Graphics/DirectXUtils.h"
 #include "Graphics/UploadBuffer.h"
+#include "Graphics/Light.h"
+#include "Graphics/Material.h"
 
 struct ObjectConstants
 {
@@ -24,23 +26,32 @@ struct PassConstants
     float FarZ = 0.0f;
     float TotalTime = 0.0f;
     float DeltaTime = 0.0f;
+
+    XMFLOAT4 AmbientLight = { 0.0f, 0.0f, 0.0f, 1.0f };
+    Light Lights[MaxLights];
 };
 
 struct Vertex
 {
+    Vertex() = default;
+    Vertex(XMFLOAT3 pos, XMFLOAT3 normal)
+        : Pos(pos), Normal(normal) { }
+
     XMFLOAT3 Pos;
-    XMFLOAT4 Color;
+    XMFLOAT3 Normal;
 };
 
 // Permet de stocker les ressources nécessaires au CPU pour construire les listes de commande pour une frame.
 struct FrameResource
 {
 public:
-    FrameResource(ID3D12Device* device, UINT passCount, UINT objectCount)
+    FrameResource(ID3D12Device* device, UINT passCount, UINT objectCount, UINT materialCount, UINT waveVertexCount)
     {
         ThrowIfFailed(device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(CommandListAllocator.GetAddressOf())));
         PassCB = std::make_unique<UploadBuffer<PassConstants>>(device, passCount, true);
         ObjectCB = std::make_unique<UploadBuffer<ObjectConstants>>(device, objectCount, true);
+        MaterialCB = std::make_unique<UploadBuffer<MaterialConstants>>(device, materialCount, true);
+        WavesVB = std::make_unique<UploadBuffer<Vertex>>(device, waveVertexCount, false);
     }
     ~FrameResource() = default;
     FrameResource(const FrameResource& rhs) = delete;
@@ -52,6 +63,8 @@ public:
     // On ne peut pas mettre à jour un constant buffer tant que le GPu n'a pas fini de traiter les commandes qui le référencent. Donc chaque frame a son propre cbuffer.
     std::unique_ptr<UploadBuffer<PassConstants>> PassCB = nullptr;
     std::unique_ptr<UploadBuffer<ObjectConstants>> ObjectCB = nullptr;
+    std::unique_ptr<UploadBuffer<MaterialConstants>> MaterialCB = nullptr;
+    std::unique_ptr<UploadBuffer<Vertex>> WavesVB = nullptr;
 
     // Valeur de la barrière pour marquer les commandes jusqu'à ce point. Cela nous permet de vérifier si ces ressources de frame sont toujours utilisées par le GPU.
     UINT64 Fence = 0;

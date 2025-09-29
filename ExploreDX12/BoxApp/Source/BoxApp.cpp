@@ -2,6 +2,8 @@
 
 #include <array>
 
+using namespace DirectX;
+
 BoxApp::BoxApp(HINSTANCE hInstance)
     : Application(hInstance)
 {
@@ -14,7 +16,7 @@ void BoxApp::OnWindowResize()
     Application::OnWindowResize();
 
     // Quand la fenêtre est resize, on doit mettre à jour l'aspect ratio et recalculer la matrice de projection.
-    XMMATRIX P = XMMatrixPerspectiveFovLH(0.25f * MathUtils::Pi, WindowManager::AspectRatio(), 1.0f, 1000.0f);
+    XMMATRIX P = XMMatrixPerspectiveFovLH(0.25f * DirectXMathUtils::Pi, WindowManager::AspectRatio(), 1.0f, 1000.0f);
     XMStoreFloat4x4(&mProj, P);
 }
 
@@ -47,7 +49,7 @@ void BoxApp::OnMouseMove(WPARAM btnState, int x, int y)
         mTheta += dx;
         mPhi += dy;
 
-        mPhi = MathUtils::Clamp(mPhi, 0.1f, MathUtils::Pi - 0.1f);
+        mPhi = DirectXMathUtils::Clamp(mPhi, 0.1f, DirectXMathUtils::Pi - 0.1f);
     } 
     else if ((btnState & MK_RBUTTON) != 0)
     {
@@ -56,7 +58,7 @@ void BoxApp::OnMouseMove(WPARAM btnState, int x, int y)
 
         mRadius += dx - dy;
 
-        mRadius = MathUtils::Clamp(mRadius, 3.0f, 15.0f);
+        mRadius = DirectXMathUtils::Clamp(mRadius, 3.0f, 15.0f);
     }
 
     mLastMousePos.x = x;
@@ -175,7 +177,7 @@ void BoxApp::BuildConstantBuffers()
 {
     mObjectCB = std::make_unique<UploadBuffer<ObjectConstants>>(DirectX12::D3DDevice.Get(), 1, true);
 
-    UINT objCBByteSize = D3DUtils::CalcConstantBufferByteSize(sizeof(ObjectConstants));
+    UINT objCBByteSize = DirectXUtils::CalcConstantBufferByteSize(sizeof(ObjectConstants));
 
     D3D12_GPU_VIRTUAL_ADDRESS cbAddress = mObjectCB->Resource()->GetGPUVirtualAddress();
     int boxCBufIndex = 0;
@@ -183,7 +185,7 @@ void BoxApp::BuildConstantBuffers()
 
     D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc;
     cbvDesc.BufferLocation = cbAddress;
-    cbvDesc.SizeInBytes = D3DUtils::CalcConstantBufferByteSize(sizeof(ObjectConstants));
+    cbvDesc.SizeInBytes = DirectXUtils::CalcConstantBufferByteSize(sizeof(ObjectConstants));
 
     DirectX12::D3DDevice->CreateConstantBufferView(&cbvDesc, mCbvHeap->GetCPUDescriptorHandleForHeapStart());
 }
@@ -213,8 +215,8 @@ void BoxApp::BuildShadersAndInputLayout()
 {
     HRESULT hr = S_OK;
 
-    mvsByteCode = D3DUtils::CompileShader(L"Shaders\\color.hlsl", nullptr, "VS", "vs_5_0");
-    mpsByteCode = D3DUtils::CompileShader(L"Shaders\\color.hlsl", nullptr, "PS", "ps_5_0");
+    mvsByteCode = DirectXUtils::CompileShader(L"Shaders\\color.hlsl", nullptr, "VS", "vs_5_0");
+    mpsByteCode = DirectXUtils::CompileShader(L"Shaders\\color.hlsl", nullptr, "PS", "ps_5_0");
 
     mInputLayout =
     {
@@ -257,8 +259,8 @@ void BoxApp::BuildBoxGeometry()
     ThrowIfFailed(D3DCreateBlob(ibByteSize, &mBoxGeo->IndexBufferCPU));
     CopyMemory(mBoxGeo->IndexBufferCPU->GetBufferPointer(), indices.data(), ibByteSize);
 
-    mBoxGeo->VertexBufferGPU = D3DUtils::CreateDefaultBuffer(DirectX12::D3DDevice.Get(), DirectX12::CommandList.Get(), vertices.data(), vbByteSize, mBoxGeo->VertexBufferUploader);
-    mBoxGeo->IndexBufferGPU = D3DUtils::CreateDefaultBuffer(DirectX12::D3DDevice.Get(), DirectX12::CommandList.Get(), indices.data(), ibByteSize, mBoxGeo->IndexBufferUploader);
+    mBoxGeo->VertexBufferGPU = DirectXUtils::CreateDefaultBuffer(DirectX12::D3DDevice.Get(), DirectX12::CommandList.Get(), vertices.data(), vbByteSize, mBoxGeo->VertexBufferUploader);
+    mBoxGeo->IndexBufferGPU = DirectXUtils::CreateDefaultBuffer(DirectX12::D3DDevice.Get(), DirectX12::CommandList.Get(), indices.data(), ibByteSize, mBoxGeo->IndexBufferUploader);
 
     mBoxGeo->VertexByteStride = sizeof(Vertex);
     mBoxGeo->VertexBufferByteSize = vbByteSize;

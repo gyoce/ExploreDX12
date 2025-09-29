@@ -2,6 +2,8 @@
 
 #include "Managers/WindowManager.h"
 
+#include <dxgidebug.h>
+
 namespace DirectX12
 {
     void CreateDevice();

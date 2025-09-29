@@ -1,11 +1,16 @@
 #pragma once
 
-#include "Graphics/D3DUtils.h"
+#include "Graphics/DirectXUtils.h"
 
 #include <unordered_map>
 
 struct SubmeshGeometry
 {
+	SubmeshGeometry() = default;
+	SubmeshGeometry(UINT indexCount, UINT startIndexLocation, INT baseVertexLocation)
+		: IndexCount(indexCount), StartIndexLocation(startIndexLocation), BaseVertexLocation(baseVertexLocation) 
+	{ }
+
 	UINT IndexCount = 0;
 	UINT StartIndexLocation = 0;
 	INT BaseVertexLocation = 0;
