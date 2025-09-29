@@ -364,7 +364,7 @@ struct Material
 {
     float4 DiffuseAlbedo;
     float3 FresnelR0;
-    // La brilliance est l'inverse de la rugosité : Shininess = 1 - roughness.
+    // La brillance est l'inverse de la rugosité : Shininess = 1 - roughness.
     float Shininess;
 };
 
@@ -376,6 +376,7 @@ float3 BlinnPhong(float3 lightStrength, float3 lightVec, float3 normal, float3 t
     float roughnessFactor = (m + 8.0f) * pow(max(dot(halfVec, normal), 0.0f), m) / 8.0f;
     float3 fresnelFactor = SchlickFresnel(mat.FresnelR0, halfVec, lightVec);
     // L'équation spéculaire va en dehors de l'interval [0,1], mais on fait du rendu LDR. Donc on la scale un peu.
+    float3 specAlbedo = fresnelFactor * roughnessFactor;
     specAlbedo = specAlbedo / (specAlbedo + 1.0f);
     return (mat.DiffuseAlbedo.rgb + specAlbedo) * lightStrength;
 }
@@ -491,7 +492,7 @@ Voici le code qui contient le vertex et le pixel shader qu'on pourra utiliser :
 #endif
 
 
-#include “LightingUtil.hlsl”
+#include "LightingUtil.hlsl"
 
 // Données constantes qui varient par frame.
 cbuffer cbPerObject : register(b0)
