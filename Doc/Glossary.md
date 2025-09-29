@@ -4,7 +4,9 @@
 
 Sommaire : 
 - [D3D12_CPU_DESCRIPTOR_HANDLE](#d3d12_cpu_descriptor_handle)
+- [D3D12_GPU_DESCRIPTOR_HANDLE](#d3d12_gpu_descriptor_handle)
 - [D3D12_RESOURCE_BARRIER](#d3d12_resource_barrier)
+- [D3D12_ROOT_PARAMETER](#d3d12_root_parameter)
 - [ID3DBlob](#id3dblob)
 - [ID3D12CommandAllocator](#id3d12commandallocator)
 - [ID3D12CommandList](#id3d12commandlist)
@@ -24,10 +26,25 @@ Sommaire :
 
 Un descripteur CPU est une structure qui représente un pointeur vers un descripteur dans un tas de descripteurs (*descriptor heap*). Il est utilisé par le CPU pour accéder et manipuler les descripteurs. On peut obtenir le *handle* du premier descripteur dans un tas de descripteurs avec la méthode `ID3D12DescriptorHeap::GetCPUDescriptorHandleForHeapStart()` ou à une certaine position avec la fonction `CD3DX12_CPU_DESCRIPTOR_HANDLE::Offset()`.
 
+## D3D12_GPU_DESCRIPTOR_HANDLE
+[Documentation](https://learn.microsoft.com/en-us/windows/win32/api/d3d12/ns-d3d12-d3d12_gpu_descriptor_handle)
+
+Un descripteur GPU est une structure qui représente un pointeur vers un descripteur dans un tas de descripteurs (*descriptor heap*). Il est utilisé par le GPU pour accéder aux descripteurs lors de l'exécution des shaders. On peut obtenir le *handle* du premier descripteur dans un tas de descripteurs avec la méthode `ID3D12DescriptorHeap::GetGPUDescriptorHandleForHeapStart()` ou à une certaine position avec la fonction `CD3DX12_GPU_DESCRIPTOR_HANDLE::Offset()`.
+
+## D3D12_INPUT_ELEMENT_DESC
+[Documentation](https://learn.microsoft.com/en-us/windows/win32/api/d3d12/ns-d3d12-d3d12_input_element_desc) | [Explications](/Doc/DirectXDrawing.md#sommets-et-input-layouts)
+
+Un élément d'entrée (*input element*) est une structure qui décrit un composant individuel d'un sommet dans un vertex buffer. Chaque élément d'entrée spécifie le nom du composant, son format de données, son emplacement dans la structure de sommet, etc. Un tableau de `D3D12_INPUT_ELEMENT_DESC` est utilisé pour définir un *input layout* lors de la création du Pipeline State Object (PSO).
+
 ## D3D12_RESOURCE_BARRIER
 [Documentation](https://learn.microsoft.com/en-us/windows/win32/api/d3d12/ns-d3d12-d3d12_resource_barrier) | [Explications](/Doc/Overview.md#resource-transitions)
 
 Une barrière de ressource (*resource barrier*) est une structure qui décrit une transition d'état pour une ressource. Elle est utilisée pour informer le GPU qu'une ressource va changer d'utilisation, par exemple passer d'une utilisation de rendu à une utilisation de lecture par un shader. 
+
+## D3D12_ROOT_PARAMETER
+[Documentation](https://learn.microsoft.com/en-us/windows/win32/api/d3d12/ns-d3d12-d3d12_root_parameter)
+
+Un paramètre racine (*root parameter*) est une structure qui fait partie d'une *root signature*. Il définit comment une ressource est liée à la pipeline de rendu. Un paramètre racine peut être un descripteur unique, une table de descripteurs ou un constant buffer.
 
 ## ID3DBlob
 [Documentation](https://learn.microsoft.com/en-us/previous-versions/windows/desktop/legacy/ff728743(v=vs.85))
