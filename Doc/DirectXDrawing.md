@@ -9,6 +9,7 @@ Sommaire :
 - [Vertex shader](#vertex-shader)
 - [Pixel shader](#pixel-shader)
 - [Constant buffers](#constant-buffers)
+    - [Upload buffer](#upload-buffer)
     - [Root signature](#root-signature)
 - [Compilation des shaders](#compilation-des-shaders)
 - [Rasterizer state](#rasterizer-state)
@@ -379,6 +380,8 @@ struct ObjectConstants
 };
 ConstantBuffer<OBjectConstants> gObjConstants : register(b0);
 ```
+
+### Upload buffer
 On peut mettre à jour les buffers constant mais pour ce faire on doit d'abord obtenir un pointeur vers les données de ressource qui peut être fait : 
 ```c++
 ComPtr<ID3D12Resource> uploadBuffer;

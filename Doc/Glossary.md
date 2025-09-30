@@ -17,8 +17,10 @@ Sommaire :
 - [ID3D12Resource](#id3d12resource)
 - [ID3D12RootSignature](#id3d12rootsignature)
 - [IDXGISwapChain](#idxgiswapchain)
+- [Frame resource](#frame-resource)
 - [Input layout](#input-layout)
 - [Pipeline State Object (PSO)](#pipeline-state-object-pso)
+- [Upload buffer](#upload-buffer)
 - [Views / Descriptors](#views--descriptors)
 
 ## D3D12_CPU_DESCRIPTOR_HANDLE
@@ -98,6 +100,11 @@ Une *root signature* est une structure qui définit les ressources que les shade
 
 Une chaîne d'échange (*swap chain*) est une série de tampons d'images utilisés pour afficher des images à l'écran. Généralement on parle de *front buffer* et de *back buffer* (qui ne sont que des textures). Elle nous fournit des méthodes pour redimensionner les buffers ou pour "présenter" i.e. afficher le buffer à l'écran. 
 
+## Frame resource
+[Explications](/Doc/DirectXDrawing2.md#frame-resource)
+
+Une *frame resource* est un concept important avec DirectX. Pour éviter que le CPU ou que le GPU n'attendent l'un l'autre, on crée plusieurs ensembles de ressources (généralement 3) que le CPU peut remplir pendant que le GPU travaille sur un autre ensemble. Chaque ensemble de ressources est appelé une *frame resource* et contient des ressources comme des constants buffer, vertex buffer, index buffer, etc.
+
 ## Input layout
 [Documentation](https://learn.microsoft.com/en-us/windows/win32/api/d3d12/ns-d3d12-d3d12_input_element_desc) | [Explications](/Doc/DirectXDrawing.md#sommets-et-input-layouts)
 
@@ -107,6 +114,11 @@ Un *input layout* est une structure qui décrit la disposition des données de s
 [Documentation](https://learn.microsoft.com/en-us/windows/win32/api/d3d12/ns-d3d12-d3d12_graphics_pipeline_state_desc) | [Explications](/Doc/DirectXDrawing.md#pipeline-state-object)
 
 Un Pipeline State Object (PSO) est une structure qui encapsule tous les états de la pipeline graphique. Il inclut des informations sur les shaders, le format des rendus, les états de rasterization, les états de profondeur/stencil, etc. Le PSO est créé une fois et peut être réutilisé pour dessiner plusieurs objets. On a alors un objet de type `ID3D12PipelineState` qui est créé avec la méthode `ID3D12Device::CreateGraphicsPipelineState()` et qui sera utilisé lors du rendu avec la méthode `CommandList::Reset(pCommandAllocator, pPipelineState)`.
+
+## Upload buffer
+[Explications](/Doc/DirectXDrawing.md#upload-buffer)
+
+Un *upload buffer* est un concept utilisé pour transférer des données du CPU vers le GPU. Il s'agit d'une ressource de type `ID3D12Resource` créée avec le flag `D3D12_HEAP_TYPE_UPLOAD`. On peut ensuite mapper cette ressource en mémoire CPU pour y copier les données, puis utiliser une commande de copie pour transférer ces données vers une ressource GPU.
 
 ## Views / Descriptors
 [Documentation](https://learn.microsoft.com/en-us/windows/win32/direct3d12/descriptors) | [Explications](/Doc/Overview.md#ressources-et-descripteurs)
