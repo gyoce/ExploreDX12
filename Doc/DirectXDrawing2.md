@@ -10,6 +10,7 @@ Sommaire :
     - [Le cylindre](#le-cylindre)
     - [La sphère](#la-sphère)
     - [La géosphère](#la-géosphère)
+    - [La grille](#la-grille)
 
 ## Frame Resource
 Pour rappel, le CPU et le GPU travaillent en parallèle. Le CPU prépare et soumet des listes de commandes et le GPU traite les commandes dans la file de commande. Le but est de garder le CPU et le GPU occupés pour profiter au maximum de la puissance de la machine. Jusqu'à présent, on a synchronisé le CPU et le GPU une fois par frame parce que : 
@@ -584,6 +585,76 @@ GeometryGenerator::MeshData GeometryGenerator::CreateGeosphere(float radius, uin
         meshData.Vertices[i].TangentU.z = + radius * sinf(phi) * cosf(theta);
         XMVECTOR T = XMLoadFloat3(&meshData.Vertices[i].TangentU);
         XMStoreFloat3(&meshData.Vertices[i].TangentU, XMVector3Normalize(T));
+    }
+
+    return meshData;
+}
+```
+### La grille
+On peut construire une grille sur le plan xz avec $`m \times n`$ sommets ce qui engendre $(m-1) \times (n-1)$ cellules. Chaque cellule est composée de deux triangles, il y a donc un total de $`2(m-1)(n-1)`$ triangles. Soit la largeur $`w`$ et la profondeur $`d`$ de la grille, l'espacement entre les cellules le long de l'axe x est $`dx = \frac{w}{n-1}`$ et le long de l'axe z est $`dz = \frac{d}{m-1}`$. Pour la génération, on peut commencer par le coin supérieur gauche et itérer ligne par ligne. On peut donc avoir les coordonnées de la cellule $`(i,j)`$ avec : $`v_{ij} = [-0.5w + j \times dx, 0.0, -0.5d + i \times dz]`$
+
+![Grille](/Doc/Imgs/Grid.png)
+
+Pour le calcul des indices, on itére sur chaque cellule, ligne par ligne en commençant par le coin supérieur gauche et on calcule les indices des deux triangles qui composent la cellule. Pour une cellule annoté comme ci-dessous $`ABCD`$, on peut obtenir les indices deux triangles par : $`\Delta{ABC} = (i \times n + j, i \times n + j + 1, (i + 1) \times n + j)`$ et $`\Delta{ACD} = ((i + 1) \times n + j, i \times n + j + 1, (i + 1) \times n + j + 1)`$.
+
+![Grille 2](/Doc/Imgs/Grid2.png)
+
+Voici un exemple d'implémentation :
+```c++
+GeometryGenerator::MeshData GeometryGenerator::CreateGrid(float width, float depth, std::uint32_t m, std::uint32_t n)
+{
+    MeshData meshData;
+
+    std::uint32_t vertexCount = m * n;
+    std::uint32_t faceCount = (m - 1) * (n - 1) * 2;
+
+    float halfWidth = 0.5f * width;
+    float halfDepth = 0.5f * depth;
+
+    float dx = width / (n - 1);
+    float dz = depth / (m - 1);
+
+    float du = 1.0f / (n - 1);
+    float dv = 1.0f / (m - 1);
+    
+    // Création des sommets.
+    meshData.Vertices.resize(vertexCount);
+    for (std::uint32_t i = 0; i < m; ++i)
+    {
+        float z = halfDepth - i * dz;
+        for (std::uint32_t j = 0; j < n; ++j)
+        {
+            float x = -halfWidth + j * dx;
+
+            meshData.Vertices[i * n + j].Position = XMFLOAT3(x, 0.0f, z);
+            meshData.Vertices[i * n + j].Normal = XMFLOAT3(0.0f, 1.0f, 0.0f);
+            meshData.Vertices[i * n + j].TangentU = XMFLOAT3(1.0f, 0.0f, 0.0f);
+
+            // On étire la texture sur la grille.
+            meshData.Vertices[i * n + j].TexC.x = j * du;
+            meshData.Vertices[i * n + j].TexC.y = i * dv;
+        }
+    }
+
+    // Création des indices.
+    meshData.Indices32.resize(faceCount * 3); // 3 indices par face.
+
+    // On itére sur chaque quad et on calcule les indices.
+    std::uint32_t k = 0;
+    for (std::uint32_t i = 0; i < m - 1; ++i)
+    {
+        for (std::uint32_t j = 0; j < n - 1; ++j)
+        {
+            meshData.Indices32[k] = i * n + j;
+            meshData.Indices32[k + 1] = i * n + j + 1;
+            meshData.Indices32[k + 2] = (i + 1) * n + j;
+
+            meshData.Indices32[k + 3] = (i + 1) * n + j;
+            meshData.Indices32[k + 4] = i * n + j + 1;
+            meshData.Indices32[k + 5] = (i + 1) * n + j + 1;
+
+            k += 6;
+        }
     }
 
     return meshData;
